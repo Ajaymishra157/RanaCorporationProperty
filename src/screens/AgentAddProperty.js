@@ -1,0 +1,1221 @@
+import {
+    View,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    SafeAreaView,
+    ScrollView,
+    Image,
+    Alert,
+    FlatList,
+    ToastAndroid
+} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import colors from '../constants/Colors';
+import CustomButton from '../components/CustomButton';
+import ImagePicker from 'react-native-image-crop-picker';
+import Header from '../components/Header';
+import ApiConstant from '../constants/ApiConstant';
+
+const AgentAddProperty = () => {
+    const navigation = useNavigation();
+
+    const route = useRoute();
+    const { property } = route.params || {};
+
+    // Property states
+    const [propertyType, setPropertyType] = useState('Residential');
+    const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
+    const [price, setPrice] = useState('');
+    const [area, setArea] = useState('');
+    const [bedrooms, setBedrooms] = useState('');
+    const [bathrooms, setBathrooms] = useState('');
+    const [location, setLocation] = useState('');
+    const [city, setCity] = useState('');
+    const [pincode, setPincode] = useState('');
+    const [amenities, setAmenities] = useState([]);
+    const [listCategory, setListCategory] = useState([]);
+    const [selectedCategory, setSelectedCategory] = useState(null);
+    const [dropdownVisible, setDropdownVisible] = useState(false);
+
+    const [budget, setBudget] = useState('');
+    const [mapLocation, setMapLocation] = useState('');
+    const [propertyStatus, setPropertyStatus] = useState('pending');
+    const [budgetDropdownVisible, setBudgetDropdownVisible] = useState(false);
+
+
+
+
+    // Media states
+    const [photos, setPhotos] = useState([]);
+    const [videos, setVideos] = useState([]);
+    const [uploading, setUploading] = useState(false);
+
+    // Available amenities
+    const availableAmenities = [
+        'Parking', 'Swimming Pool', 'Gym', 'Garden', 'Security',
+        'Lift', 'Power Backup', 'Water Supply', 'Park', 'Club House'
+    ];
+
+    const statusOptions = ['pending', 'active', 'sold'];
+
+    const budgetOptions = ['10L-20L', '20L-30L', '30L-40L', '40L-50L', '50L-60L', '60L-70L', '70L-80L', '80L-90L', '90L-1Cr', '1Cr+'];
+    // Toggle amenity selection
+    const toggleAmenity = (amenity) => {
+        if (amenities.includes(amenity)) {
+            setAmenities(amenities.filter(item => item !== amenity));
+        } else {
+            setAmenities([...amenities, amenity]);
+        }
+    };
+
+    // 👇 Prefill fields when editing
+    useEffect(() => {
+        if (property) {
+            console.log('Edit Property Data:', property);
+
+            // ✅ Basic Information
+            setTitle(property.product_name || '');
+            setDescription(property.description || '');
+            setPrice(property.price || property.unit_price || '');
+            setArea(property.size || '');
+            setBedrooms(property.bedrooms || '');
+            setBathrooms(property.bathrooms || '');
+
+            // ✅ Property Type & Category
+            setPropertyType(property.type || 'Residential');
+
+            // ✅ Category set karna - category_id ke through
+            if (property.category_id && listCategory.length > 0) {
+                const category = listCategory.find(cat =>
+                    cat.category_id === property.category_id ||
+                    cat.id === property.category_id
+                );
+                setSelectedCategory(category);
+            }
+
+            // ✅ Location Details
+            setLocation(property.location || '');
+            setCity(property.city || property.city_name || '');
+            // setPincode(property.pincode || '');
+
+            // ✅ Additional Fields
+            setBudget(property.budget || '');
+            setMapLocation(property.map || '');
+            setPropertyStatus(property.p_status || 'pending');
+
+            // ✅ Amenities - agar string mein hai toh array mein convert karein
+            if (property.amenities) {
+                if (typeof property.amenities === 'string') {
+                    setAmenities(property.amenities.split(','));
+                } else if (Array.isArray(property.amenities)) {
+                    setAmenities(property.amenities);
+                }
+            }
+
+            // ✅ Media - Images aur Videos
+            if (property.images && Array.isArray(property.images)) {
+                const formattedPhotos = property.images.map((image, index) => ({
+                    id: `existing_photo_${index}`,
+                    uri: image,
+                    type: 'existing'
+                }));
+                setPhotos(formattedPhotos);
+            }
+
+            if (property.videos && Array.isArray(property.videos)) {
+                const formattedVideos = property.videos.map((video, index) => ({
+                    id: `existing_video_${index}`,
+                    uri: video,
+                    type: 'existing'
+                }));
+                setVideos(formattedVideos);
+            }
+
+            console.log('Form prefilled for editing');
+        }
+    }, [property, listCategory]);
+
+    // Handle photo upload (simulated)
+    // ✅ Real Photo Upload with ImageCropPicker
+    const handlePhotoUpload = async () => {
+        if (photos.length >= 10) {
+            Alert.alert('Limit Reached', 'You can upload maximum 10 photos');
+            return;
+        }
+
+        try {
+            const image = await ImagePicker.openPicker({
+                mediaType: 'photo',
+                multiple: true,
+                maxFiles: 10 - photos.length,
+                cropping: true,
+                compressImageQuality: 0.8,
+                includeBase64: false,
+            });
+
+            // Handle single or multiple images
+            const selectedImages = Array.isArray(image) ? image : [image];
+
+            const newPhotos = selectedImages.map((img, index) => ({
+                id: Date.now() + index,
+                uri: img.path,
+                width: img.width,
+                height: img.height,
+                mime: img.mime,
+            }));
+
+            setPhotos([...photos, ...newPhotos]);
+
+        } catch (error) {
+            if (error.code !== 'E_PICKER_CANCELLED') {
+                Alert.alert('Error', 'Failed to select photos');
+                console.log('Image picker error:', error);
+            }
+        }
+    };
+
+    // Handle video upload (simulated)
+    // ✅ Real Video Upload with ImageCropPicker
+    const handleVideoUpload = async () => {
+        if (videos.length >= 3) {
+            Alert.alert('Limit Reached', 'You can upload maximum 3 videos');
+            return;
+        }
+
+        try {
+            const video = await ImagePicker.openPicker({
+                mediaType: 'video',
+                multiple: false, // Single video selection
+                compressVideoPreset: 'MediumQuality',
+            });
+
+            const newVideo = {
+                id: Date.now(),
+                uri: video.path,
+                duration: video.duration,
+                size: video.size,
+                mime: video.mime,
+            };
+
+            setVideos([...videos, newVideo]);
+
+        } catch (error) {
+            if (error.code !== 'E_PICKER_CANCELLED') {
+                Alert.alert('Error', 'Failed to select video');
+                console.log('Video picker error:', error);
+            }
+        }
+    };
+    // ✅ Camera se directly photo lena
+    const handleTakePhoto = async () => {
+        if (photos.length >= 10) {
+            Alert.alert('Limit Reached', 'You can upload maximum 10 photos');
+            return;
+        }
+
+        try {
+            const image = await ImagePicker.openCamera({
+                mediaType: 'photo',
+                cropping: true,
+                compressImageQuality: 0.8,
+            });
+
+            const newPhoto = {
+                id: Date.now(),
+                uri: image.path,
+                width: image.width,
+                height: image.height,
+                mime: image.mime,
+            };
+
+            setPhotos([...photos, newPhoto]);
+
+        } catch (error) {
+            if (error.code !== 'E_PICKER_CANCELLED') {
+                Alert.alert('Error', 'Failed to take photo');
+            }
+        }
+    };
+
+    // Remove media item
+    // ✅ Existing media remove karte time check karein
+    const removeMedia = (id, type) => {
+        if (type === 'photo') {
+            const updatedPhotos = photos.filter(photo => photo.id !== id);
+            setPhotos(updatedPhotos);
+
+            // ✅ Agar existing photo delete ho rahi hai toh backend ko batao
+            if (id.includes('existing_photo')) {
+                console.log('Existing photo removed:', id);
+                // Yahan backend API call kar sakte hain specific photo delete karne ke liye
+            }
+        } else {
+            const updatedVideos = videos.filter(video => video.id !== id);
+            setVideos(updatedVideos);
+
+            if (id.includes('existing_video')) {
+                console.log('Existing video removed:', id);
+            }
+        }
+    };
+
+
+    // ✅ Reset Form Function
+    const resetForm = () => {
+        // Basic Information
+        setTitle('');
+        setDescription('');
+        setPrice('');
+        setArea('');
+        setBedrooms('');
+        setBathrooms('');
+
+        // Property Type & Category
+        setPropertyType('Residential');
+        setSelectedCategory(null);
+
+        // Location Details
+        setLocation('');
+        setCity('');
+        // setPincode('');
+
+        // Additional Fields
+        setBudget('');
+        setMapLocation('');
+        setPropertyStatus('pending');
+
+        // Amenities
+        setAmenities([]);
+
+        // Media
+        setPhotos([]);
+        setVideos([]);
+
+        // Dropdown States
+        setDropdownVisible(false);
+        setBudgetDropdownVisible(false);
+
+        console.log('Form reset successfully');
+    };
+
+    // ✅ Alternative: JSON format mein data bhejna hai toh
+    const handleSubmit = async () => {
+        setUploading(true);
+
+        try {
+            // ✅ Prepare JSON data
+            const propertyData = {
+                // ✅ Edit mode mein p_id add karein
+                ...(property && { p_id: property.p_id }),
+                category_id: selectedCategory.category_id,
+                product_name: title,
+                description: description,
+                type: propertyType,
+                price: price,
+                city: city,
+                location: location,
+                amenities: amenities.join(','),
+                budget: budget,
+                size: area,
+                map: mapLocation,
+                p_status: propertyStatus,
+                p_image: photos.map(photo => photo.uri),
+                p_video: videos.map(video => video.uri)
+            };
+
+            console.log('Sending JSON Data:', propertyData);
+            const endpoint = property
+                ? `${ApiConstant.URL}${ApiConstant.OtherURL.update_property}`
+                : `${ApiConstant.URL}${ApiConstant.OtherURL.add_property}`;
+
+            // ✅ API Call for JSON
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(propertyData),
+            });
+
+            const result = await response.json();
+            console.log('API Response:', result);
+
+            if (result.code === 200) {
+                const successMessage = property
+                    ? 'Property updated successfully!'
+                    : 'Property added successfully!';
+
+                ToastAndroid.show(successMessage, ToastAndroid.LONG);
+
+                if (!property) {
+                    resetForm(); // Sirf add mode mein reset karein
+                }
+
+                navigation.goBack();
+            } else {
+                ToastAndroid.show(result.message || 'Failed to save property', ToastAndroid.LONG);
+            }
+
+        } catch (error) {
+            console.log('Error adding property:', error);
+            ToastAndroid.show('Network error occurred', ToastAndroid.LONG);
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    // Category API Call
+    const ListCategoryApi = async () => {
+        try {
+            const response = await fetch(`${ApiConstant.URL}${ApiConstant.OtherURL.list_category}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            const result = await response.json();
+
+            if (result.code == 200 && result.payload) {
+                setListCategory(result.payload);
+            } else {
+                console.log('❌ Error: Failed to load categories');
+            }
+        } catch (error) {
+            console.log('❌ Error fetching categories:', error.message);
+        }
+    };
+
+    useEffect(() => {
+        ListCategoryApi();
+    }, []);
+
+    return (
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+                {/* ✅ Header Component Use Karein */}
+                <Header
+                    title={property ? "Edit Property" : "Add Property"}
+                    onBackPress={() => navigation.goBack()}
+                />
+
+                <View style={{ padding: 20 }}>
+
+                    {/* ✅ Category Dropdown - Normal Style */}
+                    {/* ✅ Category Dropdown with Absolute Positioning */}
+                    <Text style={{
+                        fontSize: 16,
+                        fontFamily: 'Inter-Medium',
+                        color: colors.TextColorBlack,
+                        marginBottom: 10,
+                    }}>
+                        Category *
+                    </Text>
+
+                    {/* Dropdown Container with Relative Positioning */}
+                    <View style={{ position: 'relative', marginBottom: 20 }}>
+                        {/* Dropdown Trigger */}
+                        <TouchableOpacity
+                            style={{
+                                borderWidth: 1,
+                                borderColor: '#ddd',
+                                borderRadius: 8,
+                                backgroundColor: '#f9f9f9',
+                                paddingHorizontal: 15,
+                                paddingVertical: 12,
+                                flexDirection: 'row',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                zIndex: 10,
+                            }}
+                            onPress={() => setDropdownVisible(!dropdownVisible)}
+                        >
+                            <Text style={{
+                                fontSize: 16,
+                                fontFamily: 'Inter-Medium',
+                                color: selectedCategory ? colors.TextColorBlack : colors.PlaceHolderTextcolor,
+                            }}>
+                                {selectedCategory ? selectedCategory.category_name : 'Select Category'}
+                            </Text>
+                            <Ionicons
+                                name={dropdownVisible ? "chevron-up" : "chevron-down"}
+                                size={20}
+                                color="#666"
+                            />
+                        </TouchableOpacity>
+
+                        {/* Dropdown List - Absolute Position */}
+                        {dropdownVisible && (
+                            <View style={{
+                                position: 'absolute',
+                                top: 55, // Trigger ke height ke according
+                                left: 0,
+                                right: 0,
+                                borderWidth: 1,
+                                borderColor: '#ddd',
+                                borderRadius: 8,
+                                backgroundColor: '#fff',
+                                maxHeight: 200,
+                                elevation: 5,
+                                shadowColor: '#000',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.25,
+                                shadowRadius: 3.84,
+                                zIndex: 1000, // High z-index
+                            }}>
+                                <FlatList
+                                    data={listCategory}
+                                    keyExtractor={(item) => item.category_id.toString()}
+                                    showsVerticalScrollIndicator={false}
+                                    renderItem={({ item }) => (
+                                        <TouchableOpacity
+                                            style={{
+                                                paddingVertical: 12,
+                                                paddingHorizontal: 15,
+                                                borderBottomWidth: 1,
+                                                borderBottomColor: '#f0f0f0',
+                                                backgroundColor: selectedCategory?.category_id === item.category_id ? '#f0f8ff' : '#fff',
+                                            }}
+                                            onPress={() => {
+                                                setSelectedCategory(item);
+                                                setDropdownVisible(false);
+                                            }}
+                                        >
+                                            <Text style={{
+                                                fontSize: 16,
+                                                fontFamily: 'Inter-Medium',
+                                                color: colors.TextColorBlack,
+                                            }}>
+                                                {item.category_name}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
+                                />
+                            </View>
+                        )}
+                    </View>
+
+                    {/* Property Type Selection */}
+                    <Text style={{
+                        fontSize: 16,
+                        fontFamily: 'Inter-Medium',
+                        color: colors.TextColorBlack,
+                        marginBottom: 10,
+                    }}>
+                        Property Type *
+                    </Text>
+                    <View style={{
+                        flexDirection: 'row',
+                        borderWidth: 1,
+                        borderColor: '#007AFF',
+                        borderRadius: 8,
+                        overflow: 'hidden',
+                        marginBottom: 20,
+                    }}>
+                        <TouchableOpacity
+                            style={{
+                                paddingVertical: 12,
+                                backgroundColor: propertyType === 'Residential' ? '#007AFF' : '#fff',
+                                width: '25%',
+                                justifyContent: 'center',
+                                alignItems: 'center'
+                            }}
+                            onPress={() => setPropertyType('Residential')}>
+                            <Text style={{
+                                color: propertyType === 'Residential' ? '#fff' : '#007AFF',
+                                fontFamily: 'Inter-Bold',
+                                fontSize: 12
+                            }}>
+                                Residential
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={{
+                                paddingVertical: 12,
+                                backgroundColor: propertyType === 'Commercial' ? '#007AFF' : '#fff',
+                                width: '25%',
+                                justifyContent: 'center',
+                                alignItems: 'center'
+                            }}
+                            onPress={() => setPropertyType('Commercial')}>
+                            <Text style={{
+                                color: propertyType === 'Commercial' ? '#fff' : '#007AFF',
+                                fontFamily: 'Inter-Bold',
+                                fontSize: 12
+                            }}>
+                                Commercial
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={{
+                                paddingVertical: 12,
+                                backgroundColor: propertyType === 'Rent' ? '#007AFF' : '#fff',
+                                width: '25%',
+                                justifyContent: 'center',
+                                alignItems: 'center'
+                            }}
+                            onPress={() => setPropertyType('Rent')}>
+                            <Text style={{
+                                color: propertyType === 'Rent' ? '#fff' : '#007AFF',
+                                fontFamily: 'Inter-Bold',
+                                fontSize: 12
+                            }}>
+                                Rent
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={{
+                                paddingVertical: 12,
+                                backgroundColor: propertyType === 'Buy' ? '#007AFF' : '#fff',
+                                width: '25%',
+                                justifyContent: 'center',
+                                alignItems: 'center'
+                            }}
+                            onPress={() => setPropertyType('Buy')}>
+                            <Text style={{
+                                color: propertyType === 'Buy' ? '#fff' : '#007AFF',
+                                fontFamily: 'Inter-Bold',
+                                fontSize: 12
+                            }}>
+                                Buy
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Basic Information */}
+                    <Text style={{
+                        fontSize: 18,
+                        fontFamily: 'Inter-Bold',
+                        color: colors.TextColorBlack,
+                        marginBottom: 15,
+                    }}>
+                        Basic Information
+                    </Text>
+
+                    {/* Title */}
+                    <View style={{
+                        borderWidth: 1,
+                        borderColor: '#ddd',
+                        borderRadius: 8,
+                        backgroundColor: '#f9f9f9',
+                        paddingHorizontal: 12,
+                        marginBottom: 15,
+                    }}>
+                        <TextInput
+                            style={{
+                                paddingVertical: 12,
+                                fontSize: 16,
+                                fontFamily: 'Inter-Medium',
+                                color: colors.TextColorBlack,
+                            }}
+                            placeholder="Property Title *"
+                            placeholderTextColor={colors.PlaceHolderTextcolor}
+                            value={title}
+                            onChangeText={setTitle}
+                        />
+                    </View>
+
+                    {/* Description */}
+                    <View style={{
+                        borderWidth: 1,
+                        borderColor: '#ddd',
+                        borderRadius: 8,
+                        backgroundColor: '#f9f9f9',
+                        paddingHorizontal: 12,
+                        marginBottom: 15,
+                        height: 100,
+                    }}>
+                        <TextInput
+                            style={{
+                                paddingVertical: 12,
+                                fontSize: 16,
+                                fontFamily: 'Inter-Medium',
+                                color: colors.TextColorBlack,
+                                textAlignVertical: 'top',
+                            }}
+                            placeholder="Property Description"
+                            placeholderTextColor={colors.PlaceHolderTextcolor}
+                            value={description}
+                            onChangeText={setDescription}
+                            multiline
+                            numberOfLines={4}
+                        />
+                    </View>
+
+                    {/* Price and Area Row */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 }}>
+                        <View style={{
+                            borderWidth: 1,
+                            borderColor: '#ddd',
+                            borderRadius: 8,
+                            backgroundColor: '#f9f9f9',
+                            paddingHorizontal: 12,
+                            width: '48%',
+                        }}>
+                            <TextInput
+                                style={{
+                                    paddingVertical: 12,
+                                    fontSize: 16,
+                                    fontFamily: 'Inter-Medium',
+                                    color: colors.TextColorBlack,
+                                }}
+                                placeholder="Price *"
+                                placeholderTextColor={colors.PlaceHolderTextcolor}
+                                value={price}
+                                onChangeText={setPrice}
+                                keyboardType="numeric"
+                            />
+                        </View>
+                        <View style={{
+                            borderWidth: 1,
+                            borderColor: '#ddd',
+                            borderRadius: 8,
+                            backgroundColor: '#f9f9f9',
+                            paddingHorizontal: 12,
+                            width: '48%',
+                        }}>
+                            <TextInput
+                                style={{
+                                    paddingVertical: 12,
+                                    fontSize: 16,
+                                    fontFamily: 'Inter-Medium',
+                                    color: colors.TextColorBlack,
+                                }}
+                                placeholder="Area (sq ft)"
+                                placeholderTextColor={colors.PlaceHolderTextcolor}
+                                value={area}
+                                onChangeText={setArea}
+                                keyboardType="numeric"
+                            />
+                        </View>
+                    </View>
+
+
+                    {/* ✅ Budget Dropdown */}
+                    <Text style={{
+                        fontSize: 16,
+                        fontFamily: 'Inter-Medium',
+                        color: colors.TextColorBlack,
+                        marginBottom: 10,
+                    }}>
+                        Budget Range
+                    </Text>
+                    <View style={{ position: 'relative', marginBottom: 15 }}>
+                        <TouchableOpacity
+                            style={{
+                                borderWidth: 1,
+                                borderColor: '#ddd',
+                                borderRadius: 8,
+                                backgroundColor: '#f9f9f9',
+                                paddingHorizontal: 15,
+                                paddingVertical: 12,
+                                flexDirection: 'row',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                zIndex: 10,
+                            }}
+                            onPress={() => setBudgetDropdownVisible(!budgetDropdownVisible)}
+                        >
+                            <Text style={{
+                                fontSize: 16,
+                                fontFamily: 'Inter-Medium',
+                                color: budget ? colors.TextColorBlack : colors.PlaceHolderTextcolor,
+                            }}>
+                                {budget || 'Select Budget Range'}
+                            </Text>
+                            <Ionicons
+                                name={budgetDropdownVisible ? "chevron-up" : "chevron-down"}
+                                size={20}
+                                color="#666"
+                            />
+                        </TouchableOpacity>
+
+                        {budgetDropdownVisible && (
+                            <View style={{
+                                position: 'absolute',
+                                top: 55,
+                                left: 0,
+                                right: 0,
+                                borderWidth: 1,
+                                borderColor: '#ddd',
+                                borderRadius: 8,
+                                backgroundColor: '#fff',
+                                maxHeight: 200,
+                                elevation: 5,
+                                shadowColor: '#000',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.25,
+                                shadowRadius: 3.84,
+                                zIndex: 1000,
+                            }}>
+                                <FlatList
+                                    nestedScrollEnabled={true}
+                                    data={budgetOptions}
+                                    keyExtractor={(item) => item}
+                                    showsVerticalScrollIndicator={false}
+                                    renderItem={({ item }) => (
+                                        <TouchableOpacity
+                                            style={{
+                                                paddingVertical: 12,
+                                                paddingHorizontal: 15,
+                                                borderBottomWidth: 1,
+                                                borderBottomColor: '#f0f0f0',
+                                                backgroundColor: budget === item ? '#f0f8ff' : '#fff',
+                                            }}
+                                            onPress={() => {
+                                                setBudget(item);
+                                                setBudgetDropdownVisible(false);
+                                            }}
+                                        >
+                                            <Text style={{
+                                                fontSize: 16,
+                                                fontFamily: 'Inter-Medium',
+                                                color: colors.TextColorBlack,
+                                            }}>
+                                                {item}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
+                                />
+                            </View>
+                        )}
+                    </View>
+
+                    {/* ✅ Property Status */}
+                    <Text style={{
+                        fontSize: 16,
+                        fontFamily: 'Inter-Medium',
+                        color: colors.TextColorBlack,
+                        marginBottom: 10,
+                    }}>
+                        Property Status
+                    </Text>
+                    <View style={{
+                        flexDirection: 'row',
+                        borderWidth: 1,
+                        borderColor: '#007AFF',
+                        borderRadius: 8,
+                        overflow: 'hidden',
+                        marginBottom: 20,
+                    }}>
+                        <TouchableOpacity
+                            style={{
+                                paddingVertical: 12,
+                                backgroundColor: propertyStatus === 'pending' ? '#007AFF' : '#fff',
+                                width: '33.33%',
+                                justifyContent: 'center',
+                                alignItems: 'center'
+                            }}
+                            onPress={() => setPropertyStatus('pending')}
+                        >
+                            <Text style={{
+                                color: propertyStatus === 'pending' ? '#fff' : '#007AFF',
+                                fontFamily: 'Inter-Bold',
+                                fontSize: 12
+                            }}>
+                                Rented
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={{
+                                paddingVertical: 12,
+                                backgroundColor: propertyStatus === 'active' ? '#007AFF' : '#fff',
+                                width: '33.33%',
+                                justifyContent: 'center',
+                                alignItems: 'center'
+                            }}
+                            onPress={() => setPropertyStatus('active')}
+                        >
+                            <Text style={{
+                                color: propertyStatus === 'active' ? '#fff' : '#007AFF',
+                                fontFamily: 'Inter-Bold',
+                                fontSize: 12
+                            }}>
+                                Active
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={{
+                                paddingVertical: 12,
+                                backgroundColor: propertyStatus === 'sold' ? '#007AFF' : '#fff',
+                                width: '33.33%',
+                                justifyContent: 'center',
+                                alignItems: 'center'
+                            }}
+                            onPress={() => setPropertyStatus('sold')}
+                        >
+                            <Text style={{
+                                color: propertyStatus === 'sold' ? '#fff' : '#007AFF',
+                                fontFamily: 'Inter-Bold',
+                                fontSize: 12
+                            }}>
+                                Sold
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Bedrooms and Bathrooms Row */}
+                    {/* <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
+                        <View style={{
+                            borderWidth: 1,
+                            borderColor: '#ddd',
+                            borderRadius: 8,
+                            backgroundColor: '#f9f9f9',
+                            paddingHorizontal: 12,
+                            width: '48%',
+                        }}>
+                            <TextInput
+                                style={{
+                                    paddingVertical: 12,
+                                    fontSize: 16,
+                                    fontFamily: 'Inter-Medium',
+                                    color: colors.TextColorBlack,
+                                }}
+                                placeholder="Bedrooms"
+                                placeholderTextColor={colors.PlaceHolderTextcolor}
+                                value={bedrooms}
+                                onChangeText={setBedrooms}
+                                keyboardType="numeric"
+                            />
+                        </View>
+                        <View style={{
+                            borderWidth: 1,
+                            borderColor: '#ddd',
+                            borderRadius: 8,
+                            backgroundColor: '#f9f9f9',
+                            paddingHorizontal: 12,
+                            width: '48%',
+                        }}>
+                            <TextInput
+                                style={{
+                                    paddingVertical: 12,
+                                    fontSize: 16,
+                                    fontFamily: 'Inter-Medium',
+                                    color: colors.TextColorBlack,
+                                }}
+                                placeholder="Bathrooms"
+                                placeholderTextColor={colors.PlaceHolderTextcolor}
+                                value={bathrooms}
+                                onChangeText={setBathrooms}
+                                keyboardType="numeric"
+                            />
+                        </View>
+                    </View> */}
+
+                    {/* Location Details */}
+                    <Text style={{
+                        fontSize: 18,
+                        fontFamily: 'Inter-Bold',
+                        color: colors.TextColorBlack,
+                        marginBottom: 15,
+                    }}>
+                        Location Details
+                    </Text>
+
+                    <View style={{
+                        borderWidth: 1,
+                        borderColor: '#ddd',
+                        borderRadius: 8,
+                        backgroundColor: '#f9f9f9',
+                        paddingHorizontal: 12,
+                        marginBottom: 15,
+                    }}>
+                        <TextInput
+                            style={{
+                                paddingVertical: 12,
+                                fontSize: 16,
+                                fontFamily: 'Inter-Medium',
+                                color: colors.TextColorBlack,
+                            }}
+                            placeholder="Full Address *"
+                            placeholderTextColor={colors.PlaceHolderTextcolor}
+                            value={location}
+                            multiline={true}
+                            onChangeText={setLocation}
+                        />
+                    </View>
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
+                        <View style={{
+                            borderWidth: 1,
+                            borderColor: '#ddd',
+                            borderRadius: 8,
+                            backgroundColor: '#f9f9f9',
+                            paddingHorizontal: 12,
+                            width: '100%',
+                        }}>
+                            <TextInput
+                                style={{
+                                    paddingVertical: 12,
+                                    fontSize: 16,
+                                    fontFamily: 'Inter-Medium',
+                                    color: colors.TextColorBlack,
+                                }}
+                                placeholder="City *"
+                                placeholderTextColor={colors.PlaceHolderTextcolor}
+                                value={city}
+                                onChangeText={setCity}
+                            />
+                        </View>
+                        {/* <View style={{
+                            borderWidth: 1,
+                            borderColor: '#ddd',
+                            borderRadius: 8,
+                            backgroundColor: '#f9f9f9',
+                            paddingHorizontal: 12,
+                            width: '48%',
+                        }}>
+                            <TextInput
+                                style={{
+                                    paddingVertical: 12,
+                                    fontSize: 16,
+                                    fontFamily: 'Inter-Medium',
+                                    color: colors.TextColorBlack,
+                                }}
+                                placeholder="Pincode"
+                                placeholderTextColor={colors.PlaceHolderTextcolor}
+                                value={pincode}
+                                onChangeText={setPincode}
+                                keyboardType="numeric"
+                                maxLength={6}
+                            />
+                        </View> */}
+                    </View>
+
+                    {/* Amenities */}
+                    <Text style={{
+                        fontSize: 18,
+                        fontFamily: 'Inter-Bold',
+                        color: colors.TextColorBlack,
+                        marginBottom: 15,
+                    }}>
+                        Amenities
+                    </Text>
+                    <View style={{
+                        flexDirection: 'row',
+                        flexWrap: 'wrap',
+                        justifyContent: 'space-between',
+                        marginBottom: 20,
+                    }}>
+                        {availableAmenities.map((amenity, index) => (
+                            <TouchableOpacity
+                                key={index}
+                                style={{
+                                    backgroundColor: amenities.includes(amenity) ? colors.AppColor : '#f9f9f9',
+                                    paddingVertical: 10,
+                                    paddingHorizontal: 15,
+                                    borderRadius: 20,
+                                    borderWidth: 1,
+                                    borderColor: amenities.includes(amenity) ? colors.AppColor : '#ddd',
+                                    marginBottom: 10,
+                                    width: '48%',
+                                }}
+                                onPress={() => toggleAmenity(amenity)}
+                            >
+                                <Text style={{
+                                    fontSize: 14,
+                                    fontFamily: 'Inter-Medium',
+                                    color: amenities.includes(amenity) ? '#fff' : colors.TextColorBlack,
+                                    textAlign: 'center',
+                                }}>
+                                    {amenity}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+
+                    <Text style={{
+                        fontSize: 18,
+                        fontFamily: 'Inter-Bold',
+                        color: colors.TextColorBlack,
+                        marginBottom: 15,
+                    }}>
+                        Media Upload
+                    </Text>
+
+                    {/* Photos */}
+                    <Text style={{
+                        fontSize: 16,
+                        fontFamily: 'Inter-Medium',
+                        color: colors.TextColorBlack,
+                        marginBottom: 10,
+                    }}>
+                        Photos ({photos.length}/10)
+                    </Text>
+
+                    {/* ✅ Photo Upload Options */}
+                    <View style={{ flexDirection: 'row', marginBottom: 15, gap: 10 }}>
+                        <TouchableOpacity
+                            style={{
+                                flex: 1,
+                                backgroundColor: colors.AppColor,
+                                paddingVertical: 12,
+                                borderRadius: 8,
+                                alignItems: 'center',
+                                flexDirection: 'row',
+                                justifyContent: 'center',
+                            }}
+                            onPress={handlePhotoUpload}
+                        >
+                            <Ionicons name="images-outline" size={20} color="#fff" />
+                            <Text style={{
+                                fontSize: 14,
+                                fontFamily: 'Inter-Medium',
+                                color: '#fff',
+                                marginLeft: 8,
+                            }}>
+                                Gallery
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={{
+                                flex: 1,
+                                backgroundColor: '#4CAF50',
+                                paddingVertical: 12,
+                                borderRadius: 8,
+                                alignItems: 'center',
+                                flexDirection: 'row',
+                                justifyContent: 'center',
+                            }}
+                            onPress={handleTakePhoto}
+                        >
+                            <Ionicons name="camera-outline" size={20} color="#fff" />
+                            <Text style={{
+                                fontSize: 14,
+                                fontFamily: 'Inter-Medium',
+                                color: '#fff',
+                                marginLeft: 8,
+                            }}>
+                                Camera
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Photos Preview */}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 15 }}>
+                        {photos.map((photo) => (
+                            <View key={photo.id} style={{ position: 'relative', marginRight: 10 }}>
+                                <Image
+                                    source={{ uri: photo.uri }}
+                                    style={{
+                                        width: 120,
+                                        height: 120,
+                                        borderRadius: 8,
+                                    }}
+                                />
+                                <TouchableOpacity
+                                    style={{
+                                        position: 'absolute',
+                                        top: 5,
+                                        right: 5,
+                                        backgroundColor: 'rgba(0,0,0,0.7)',
+                                        borderRadius: 12,
+                                        width: 24,
+                                        height: 24,
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                    }}
+                                    onPress={() => removeMedia(photo.id, 'photo')}
+                                >
+                                    <Ionicons name="close" size={16} color="#fff" />
+                                </TouchableOpacity>
+                            </View>
+                        ))}
+                    </ScrollView>
+
+                    {/* Videos */}
+                    <Text style={{
+                        fontSize: 16,
+                        fontFamily: 'Inter-Medium',
+                        color: colors.TextColorBlack,
+                        marginBottom: 10,
+                    }}>
+                        Videos ({videos.length}/3)
+                    </Text>
+
+                    <TouchableOpacity
+                        style={{
+                            backgroundColor: '#FF9800',
+                            paddingVertical: 12,
+                            borderRadius: 8,
+                            alignItems: 'center',
+                            flexDirection: 'row',
+                            justifyContent: 'center',
+                            marginBottom: 15,
+                        }}
+                        onPress={handleVideoUpload}
+                    >
+                        <Ionicons name="videocam-outline" size={20} color="#fff" />
+                        <Text style={{
+                            fontSize: 14,
+                            fontFamily: 'Inter-Medium',
+                            color: '#fff',
+                            marginLeft: 8,
+                        }}>
+                            Select Video
+                        </Text>
+                    </TouchableOpacity>
+
+                    {/* Videos Preview */}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 30 }}>
+                        {videos.map((video) => (
+                            <View key={video.id} style={{ position: 'relative', marginRight: 10 }}>
+                                <View style={{
+                                    width: 120,
+                                    height: 120,
+                                    backgroundColor: '#f0f0f0',
+                                    borderRadius: 8,
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                }}>
+                                    <Ionicons name="play-circle" size={40} color="#888" />
+                                    <Text style={{
+                                        fontSize: 10,
+                                        fontFamily: 'Inter-Regular',
+                                        color: '#666',
+                                        marginTop: 5,
+                                        textAlign: 'center',
+                                    }}>
+                                        {Math.round(video.duration / 1000)}s
+                                    </Text>
+                                </View>
+                                <TouchableOpacity
+                                    style={{
+                                        position: 'absolute',
+                                        top: 5,
+                                        right: 5,
+                                        backgroundColor: 'rgba(0,0,0,0.7)',
+                                        borderRadius: 12,
+                                        width: 24,
+                                        height: 24,
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                    }}
+                                    onPress={() => removeMedia(video.id, 'video')}
+                                >
+                                    <Ionicons name="close" size={16} color="#fff" />
+                                </TouchableOpacity>
+                            </View>
+                        ))}
+                    </ScrollView>
+
+                    {/* Submit Button */}
+                    <CustomButton
+                        title={property ? "Update Property" : "Add Property"}
+                        onPress={handleSubmit}
+                        variant="primary"
+                        size="large"
+                    />
+
+                </View>
+            </ScrollView>
+        </SafeAreaView>
+    );
+};
+
+export default AgentAddProperty;

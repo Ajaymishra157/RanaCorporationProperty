@@ -1,19 +1,96 @@
-import { View, Text, TextInput, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, SafeAreaView, ActivityIndicator, ToastAndroid } from 'react-native';
 import React, { useState } from 'react';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import colors from '../constants/Colors';
 import CustomButton from '../components/CustomButton';
+import ApiConstant from '../constants/ApiConstant';
+import CountryCodePicker from '../components/CountryCodePicker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LoginScreen = () => {
     const [phoneNumber, setPhoneNumber] = useState('');
     const [password, setPassword] = useState('');
-    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [userData, setUserData] = useState(null);
+    const [EmailError, setEmailError] = useState('');
+    const [passwordError, setPasswordError] = useState('');
+    const [loginError, setLoginError] = useState('');
     const navigation = useNavigation();
+    const [countryCode, setCountryCode] = useState('+91');
+    const [Loading, setLoading] = useState(false);
 
-    const handleLogin = () => {
-        console.log('Login attempted:', { phoneNumber, password, name });
+    const handleLogin = async () => {
+        let isValid = true;
+
+        // Reset errors
+        setEmailError('');
+        setPasswordError('');
+        setLoginError('');
+
+        // Validation for Mobile
+        if (!email) {
+            setEmailError('Please Enter Email id/Mobile');
+            isValid = false;
+        }
+
+        // Password validation (minimum 4 characters)
+        if (password.length < 6) {
+            setPasswordError('Password Must be 6 Character');
+            isValid = false;
+        }
+
+
+
+        if (isValid) {
+            setLoading(true);
+            try {
+                // const fullPhoneNumber = countryCode + email;
+                console.log('contrycode ye hai', countryCode, email, password)
+                const response = await fetch(`${ApiConstant.URL}${ApiConstant.OtherURL.login}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        country_code: countryCode,
+                        username: email,
+                        password: password,
+
+                    }),
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to connect to the server');
+                }
+
+                const data = await response.json();
+                console.log('Response:', data);
+
+                // Check response status
+                if (data.code == 200) {
+                    ToastAndroid.show('Login Successfully', ToastAndroid.SHORT);
+                    const Id = data.payload.id;
+                    const username = data.payload.staff_name;
+                    await AsyncStorage.setItem('id', Id);
+                    await AsyncStorage.setItem('staff_name', username);
+
+
+                    navigation.reset({
+                        index: 0, // Reset the stack
+                        routes: [{ name: 'AgentDashboard' }], // Navigate to HomeScreen
+                    });
+                } else {
+                    setLoginError(data.message || 'Invalid credentials');
+                }
+            } catch (error) {
+                console.error('Error:', error.message);
+                setLoginError('Something went wrong. Please try again later.');
+            } finally {
+                setLoading(false);
+            }
+        }
     };
 
     const handleForgotPassword = () => {
@@ -39,17 +116,22 @@ const LoginScreen = () => {
                 <View
                     style={{
                         flexDirection: 'row',
-                        alignItems: 'center',
+
                         borderWidth: 1,
-                        borderColor: '#ddd',
+                        borderColor: EmailError ? 'red' : '#d1d5db',
                         borderRadius: 8,
                         backgroundColor: '#f9f9f9',
-                        paddingHorizontal: 12,
+
                         marginBottom: 20,
 
 
                     }}>
-                    <Ionicons name="person-outline" size={20} color="#888" />
+                    {/* Country Code Picker */}
+                    <CountryCodePicker
+                        selectedCode={countryCode}
+                        onSelect={setCountryCode}
+                    />
+                    {/* <Ionicons name="mail-outline" size={20} color="#888" /> */}
                     <TextInput
                         style={{
                             flex: 1,
@@ -60,16 +142,29 @@ const LoginScreen = () => {
                             fontFamily: 'Inter-Medium',
                             color: colors.TextColorBlack,
                         }}
-                        placeholder="Enter your name"
+                        placeholder="Enter Mobile"
                         placeholderTextColor={colors.PlaceHolderTextcolor}
-                        value={name}
-                        onChangeText={setName}
+                        value={email}
+                        onChangeText={setEmail}
                         autoCapitalize="words"
                     />
+
                 </View>
+                {EmailError ? (
+                    <Text
+                        style={{
+                            color: 'red',
+                            fontSize: 14,
+                            marginBottom: 5,
+                            marginLeft: 15,
+                            fontFamily: 'Inter-Regular',
+                        }}>
+                        {EmailError}
+                    </Text>
+                ) : null}
 
                 {/* Phone Number Input */}
-                <View
+                {/* <View
                     style={{
                         flexDirection: 'row',
                         alignItems: 'center',
@@ -98,7 +193,7 @@ const LoginScreen = () => {
                         keyboardType="phone-pad"
                         maxLength={10}
                     />
-                </View>
+                </View> */}
 
                 {/* Password Input */}
                 <View
@@ -106,7 +201,7 @@ const LoginScreen = () => {
                         flexDirection: 'row',
                         alignItems: 'center',
                         borderWidth: 1,
-                        borderColor: '#ddd',
+                        borderColor: passwordError ? 'red' : '#d1d5db',
                         borderRadius: 8,
                         backgroundColor: '#f9f9f9',
                         paddingHorizontal: 12,
@@ -137,6 +232,18 @@ const LoginScreen = () => {
                         />
                     </TouchableOpacity>
                 </View>
+                {passwordError ? (
+                    <Text
+                        style={{
+                            color: 'red',
+                            fontSize: 14,
+                            marginBottom: 5,
+                            marginLeft: 15,
+                            fontFamily: 'Inter-Regular',
+                        }}>
+                        {passwordError}
+                    </Text>
+                ) : null}
 
                 {/* Forgot Password */}
                 <TouchableOpacity
@@ -153,12 +260,30 @@ const LoginScreen = () => {
                 </TouchableOpacity>
 
                 {/* Login Button */}
-                <CustomButton
-                    title="Log in"
-                    onPress={handleLogin}
-                    variant="primary"
-                    size="medium"
-                />
+                {Loading ? (
+                    <View>
+                        <ActivityIndicator size="small" color={'#3b82f6'} />
+                    </View>
+                ) : (
+                    <CustomButton
+                        title="Log in"
+                        onPress={handleLogin}
+                        variant="primary"
+                        size="medium"
+                    />
+                )}
+                {loginError ? (
+                    <Text
+                        style={{
+                            color: 'red',
+                            fontSize: 14,
+                            marginBottom: 10,
+                            marginLeft: 15,
+                            fontFamily: 'Inter-Regular',
+                        }}>
+                        {loginError}
+                    </Text>
+                ) : null}
 
                 {/* Register Button */}
                 <CustomButton
