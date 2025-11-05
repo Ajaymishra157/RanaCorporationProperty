@@ -194,7 +194,7 @@ const RatingsReviews = () => {
                 />
 
                 {/* Overall Rating Card */}
-                <View style={{
+                {/* <View style={{
                     backgroundColor: '#fff',
                     padding: 20,
                     margin: 10,
@@ -254,13 +254,13 @@ const RatingsReviews = () => {
                                 Based on {overallStats.totalReviews} reviews
                             </Text>
 
-                            {/* Rating Breakdown */}
-                            {[5, 4, 3, 2, 1].map((rating) => (
-                                renderRatingBar(rating, overallStats.ratingBreakdown[rating])
-                            ))}
-                        </View>
-                    </View>
-                </View>
+                            {
+                {[5, 4, 3, 2, 1].map((rating) => (
+                    renderRatingBar(rating, overallStats.ratingBreakdown[rating])
+                ))}
+            </View>
+        </View>
+                </View > */}
 
                 {/* Reviews Count */}
                 <View style={{
@@ -295,173 +295,175 @@ const RatingsReviews = () => {
                 </View>
 
                 {/* Reviews List */}
-                {reviewData.length === 0 ? (
-                    <View style={{
-                        backgroundColor: '#fff',
-                        margin: 10,
-                        padding: 40,
-                        borderRadius: 12,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                    }}>
-                        <Ionicons name="star-outline" size={48} color="#ccc" />
-                        <Text style={{
-                            fontSize: 16,
-                            fontFamily: 'Inter-Medium',
-                            color: '#666',
-                            marginTop: 10,
-                            textAlign: 'center',
+                {
+                    reviewData.length === 0 ? (
+                        <View style={{
+                            backgroundColor: '#fff',
+                            margin: 10,
+                            padding: 40,
+                            borderRadius: 12,
+                            alignItems: 'center',
+                            justifyContent: 'center',
                         }}>
-                            No reviews yet
-                        </Text>
-                        <Text style={{
-                            fontSize: 14,
-                            fontFamily: 'Inter-Regular',
-                            color: '#999',
-                            marginTop: 5,
-                            textAlign: 'center',
-                        }}>
-                            Be the first to leave a review!
-                        </Text>
-                    </View>
-                ) : (
-                    reviewData.map((review, index) => {
-                        // Generate demo data for missing fields
-                        const rating = Math.floor(Math.random() * 5) + 1; // Random rating 1-5
-                        const likes = generateRandomLikes();
-                        const isLiked = generateRandomIsLiked();
-                        const property = generateRandomProperty();
-
-                        return (
-                            <View key={review.review_id} style={{
-                                backgroundColor: '#fff',
-                                marginHorizontal: 10,
-                                marginBottom: 10,
-                                padding: 15,
-                                borderRadius: 12,
-                                shadowColor: '#000',
-                                shadowOffset: { width: 0, height: 2 },
-                                shadowOpacity: 0.1,
-                                shadowRadius: 3,
-                                elevation: 3,
+                            <Ionicons name="star-outline" size={48} color="#ccc" />
+                            <Text style={{
+                                fontSize: 16,
+                                fontFamily: 'Inter-Medium',
+                                color: '#666',
+                                marginTop: 10,
+                                textAlign: 'center',
                             }}>
-                                {/* Review Header */}
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                                        <View style={{
-                                            width: 40,
-                                            height: 40,
-                                            borderRadius: 20,
-                                            backgroundColor: colors.AppColor,
-                                            justifyContent: 'center',
-                                            alignItems: 'center',
-                                            marginRight: 10,
-                                        }}>
-                                            <Text style={{
-                                                fontSize: 16,
-                                                fontFamily: 'Inter-Bold',
-                                                color: '#fff',
+                                No reviews yet
+                            </Text>
+                            <Text style={{
+                                fontSize: 14,
+                                fontFamily: 'Inter-Regular',
+                                color: '#999',
+                                marginTop: 5,
+                                textAlign: 'center',
+                            }}>
+                                Be the first to leave a review!
+                            </Text>
+                        </View>
+                    ) : (
+                        reviewData.map((review, index) => {
+                            // Generate demo data for missing fields
+                            const rating = Math.floor(Math.random() * 5) + 1; // Random rating 1-5
+                            const likes = generateRandomLikes();
+                            const isLiked = generateRandomIsLiked();
+                            const property = generateRandomProperty();
+
+                            return (
+                                <View key={review.review_id} style={{
+                                    backgroundColor: '#fff',
+                                    marginHorizontal: 10,
+                                    marginBottom: 10,
+                                    padding: 15,
+                                    borderRadius: 12,
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.1,
+                                    shadowRadius: 3,
+                                    elevation: 3,
+                                }}>
+                                    {/* Review Header */}
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                            <View style={{
+                                                width: 40,
+                                                height: 40,
+                                                borderRadius: 20,
+                                                backgroundColor: colors.AppColor,
+                                                justifyContent: 'center',
+                                                alignItems: 'center',
+                                                marginRight: 10,
                                             }}>
-                                                {review.customer_name.charAt(0).toUpperCase()}
-                                            </Text>
+                                                <Text style={{
+                                                    fontSize: 16,
+                                                    fontFamily: 'Inter-Bold',
+                                                    color: '#fff',
+                                                }}>
+                                                    {review.customer_name.charAt(0).toUpperCase()}
+                                                </Text>
+                                            </View>
+
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={{
+                                                    fontSize: 16,
+                                                    fontFamily: 'Inter-Bold',
+                                                    color: colors.TextColorBlack,
+                                                    marginBottom: 2,
+                                                }}>
+                                                    {review.customer_name}
+                                                </Text>
+                                                <Text style={{
+                                                    fontSize: 12,
+                                                    fontFamily: 'Inter-Regular',
+                                                    color: '#666',
+                                                }}>
+                                                    {property}
+                                                </Text>
+                                            </View>
                                         </View>
 
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={{
-                                                fontSize: 16,
-                                                fontFamily: 'Inter-Bold',
-                                                color: colors.TextColorBlack,
-                                                marginBottom: 2,
-                                            }}>
-                                                {review.customer_name}
-                                            </Text>
+                                        <Text style={{
+                                            fontSize: 12,
+                                            fontFamily: 'Inter-Regular',
+                                            color: '#999',
+                                        }}>
+                                            {formatRelativeTime(review.entrydate)}
+                                        </Text>
+                                    </View>
+
+                                    {/* Rating Stars */}
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                                        {renderStars(rating)}
+                                        <Text style={{
+                                            fontSize: 12,
+                                            fontFamily: 'Inter-Medium',
+                                            color: '#666',
+                                            marginLeft: 8,
+                                        }}>
+                                            {rating}.0
+                                        </Text>
+                                    </View>
+
+                                    {/* Review Comment */}
+                                    <Text style={{
+                                        fontSize: 14,
+                                        fontFamily: 'Inter-Regular',
+                                        color: colors.TextColorBlack,
+                                        lineHeight: 20,
+                                        marginBottom: 10,
+                                    }}>
+                                        {review.msg}
+                                    </Text>
+
+                                    {/* Review Actions */}
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <TouchableOpacity style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                        }}>
+                                            <Ionicons
+                                                name={isLiked ? "heart" : "heart-outline"}
+                                                size={18}
+                                                color={isLiked ? "#FF3B30" : "#666"}
+                                            />
                                             <Text style={{
                                                 fontSize: 12,
                                                 fontFamily: 'Inter-Regular',
                                                 color: '#666',
+                                                marginLeft: 5,
                                             }}>
-                                                {property}
+                                                {likes} likes
                                             </Text>
-                                        </View>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                        }}>
+                                            <Ionicons name="chatbubble-outline" size={16} color="#666" />
+                                            <Text style={{
+                                                fontSize: 12,
+                                                fontFamily: 'Inter-Regular',
+                                                color: '#666',
+                                                marginLeft: 5,
+                                            }}>
+                                                Reply
+                                            </Text>
+                                        </TouchableOpacity>
                                     </View>
-
-                                    <Text style={{
-                                        fontSize: 12,
-                                        fontFamily: 'Inter-Regular',
-                                        color: '#999',
-                                    }}>
-                                        {formatRelativeTime(review.entrydate)}
-                                    </Text>
                                 </View>
-
-                                {/* Rating Stars */}
-                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                                    {renderStars(rating)}
-                                    <Text style={{
-                                        fontSize: 12,
-                                        fontFamily: 'Inter-Medium',
-                                        color: '#666',
-                                        marginLeft: 8,
-                                    }}>
-                                        {rating}.0
-                                    </Text>
-                                </View>
-
-                                {/* Review Comment */}
-                                <Text style={{
-                                    fontSize: 14,
-                                    fontFamily: 'Inter-Regular',
-                                    color: colors.TextColorBlack,
-                                    lineHeight: 20,
-                                    marginBottom: 10,
-                                }}>
-                                    {review.msg}
-                                </Text>
-
-                                {/* Review Actions */}
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <TouchableOpacity style={{
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                    }}>
-                                        <Ionicons
-                                            name={isLiked ? "heart" : "heart-outline"}
-                                            size={18}
-                                            color={isLiked ? "#FF3B30" : "#666"}
-                                        />
-                                        <Text style={{
-                                            fontSize: 12,
-                                            fontFamily: 'Inter-Regular',
-                                            color: '#666',
-                                            marginLeft: 5,
-                                        }}>
-                                            {likes} likes
-                                        </Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity style={{
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                    }}>
-                                        <Ionicons name="chatbubble-outline" size={16} color="#666" />
-                                        <Text style={{
-                                            fontSize: 12,
-                                            fontFamily: 'Inter-Regular',
-                                            color: '#666',
-                                            marginLeft: 5,
-                                        }}>
-                                            Reply
-                                        </Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        );
-                    })
-                )}
+                            );
+                        })
+                    )
+                }
 
                 <View style={{ height: 20 }} />
-            </ScrollView>
-        </SafeAreaView>
+            </ScrollView >
+        </SafeAreaView >
     );
 };
 

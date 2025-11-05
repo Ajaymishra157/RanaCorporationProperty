@@ -14,6 +14,7 @@ import Favorites from '../screens/Favorites'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import colors from '../constants/Colors'
 import KYCVerification from '../screens/KYCVerification'
+import ViewLeads from '../screens/ViewLeads'
 
 const Stack = createNativeStackNavigator()
 
@@ -97,6 +98,13 @@ const RouteNavigation = () => {
                     component={KYCVerification}
                     options={{ headerShown: false }}
                 />
+                <Stack.Screen
+                    name="ViewLeads"
+                    component={ViewLeads}
+                    options={{ headerShown: false }}
+                />
+
+
 
 
 

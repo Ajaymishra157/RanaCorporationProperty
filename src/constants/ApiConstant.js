@@ -10,6 +10,8 @@ const ApiConstant = {
         Add_user: 'user/add_user.php',
         list_user: 'user/list_user.php',
         add_kyc: 'user/add_kyc.php',
+        check_kyc: 'user/check_kyc.php',
+
 
 
 
@@ -24,6 +26,10 @@ const ApiConstant = {
         list_enquiry: 'enquiry/list_enquiry.php',
 
         list_review: 'rating_review/list_review.php',
+
+        count_view_property: 'count_view_property.php',
+
+
 
 
 

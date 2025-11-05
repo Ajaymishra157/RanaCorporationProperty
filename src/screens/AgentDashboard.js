@@ -11,6 +11,7 @@ const AgentDashboard = () => {
     const [userName, setUserName] = useState('');
     const [enquiryData, setEnquiryData] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [kycStatus, setKycStatus] = useState(null);
 
 
     useEffect(() => {
@@ -33,12 +34,68 @@ const AgentDashboard = () => {
         checkLoginName();
     }, []);
     // Sample data
+
+    // KYC Status Check API
+    const checkKYCStatus = async () => {
+        try {
+            const id = await AsyncStorage.getItem('id');
+            if (!id) {
+                console.log('❌ Staff ID not found');
+                return;
+            }
+
+            const response = await fetch(`${ApiConstant.URL}${ApiConstant.OtherURL.check_kyc}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    staff_id: id
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.code === 200 && result.payload) {
+                setKycStatus(result.payload);
+            } else {
+                console.log('❌ Error fetching KYC status:', result.message);
+                setKycStatus({ id_proof: false, kyc_verified: false });
+            }
+        } catch (error) {
+            console.log('❌ Error checking KYC status:', error.message);
+            setKycStatus({ id_proof: false, kyc_verified: false });
+        }
+    };
+
     const statsData = [
-        { id: 1, title: 'Total Views', value: '2.5K', icon: 'eye-outline', color: '#4CAF50', change: '+12%' },
-        { id: 2, title: 'Active Leads', value: '48', icon: 'people-outline', color: '#2196F3', change: '+5%' },
-        { id: 3, title: 'Properties', value: '12', icon: 'business-outline', color: '#FF9800', change: '+2' },
-        { id: 4, title: 'Revenue', value: '₹85K', icon: 'trending-up-outline', color: '#9C27B0', change: '+18%' },
+        {
+            id: 1,
+            title: 'Total Views',
+            value: enquiryData?.view_property_count || '0',
+            icon: 'eye-outline',
+            color: '#4CAF50',
+
+        },
+        {
+            id: 2,
+            title: 'Active Properties',
+            value: enquiryData?.active_property_count || '0',
+            icon: 'business-outline',
+            color: '#2196F3',
+
+        },
+        {
+            id: 3,
+            title: 'Active Enquiries',
+            value: enquiryData?.active_enquiry_count || '0',
+            icon: 'people-outline',
+            color: '#FF9800',
+
+        },
+        // { id: 4, title: 'Revenue', value: '₹85K', icon: 'trending-up-outline', color: '#9C27B0', change: '+18%' },
     ];
+
 
     const recentActivities = [
         { id: 1, type: 'New Lead', property: '3BHK Apartment', time: '2 hours ago', icon: 'person-add' },
@@ -55,26 +112,36 @@ const AgentDashboard = () => {
             color: '#4CAF50',
             onPress: () => navigation.navigate('PropertyListing')
         },
-        { id: 2, title: 'View Leads', icon: 'people-outline', color: '#2196F3', onPress: () => navigation.navigate('Profile') },
+        { id: 2, title: 'View Leads', icon: 'people-outline', color: '#2196F3', onPress: () => navigation.navigate('ViewLeads') },
         { id: 3, title: 'Schedule', icon: 'calendar-outline', color: '#FF9800' },
         // { id: 4, title: 'Analytics', icon: 'bar-chart-outline', color: '#9C27B0' },
         {
             id: 4,
             title: 'KYC Verification',
-            icon: 'shield-checkmark-outline',
-            color: '#FF5722',
-            onPress: () => navigation.navigate('KYCVerification')
+            icon: kycStatus?.kyc_verified ? 'shield-checkmark' : 'shield-checkmark-outline',
+            color: kycStatus?.kyc_verified ? '#4CAF50' : '#FF5722',
+            onPress: () => {
+                if (kycStatus?.kyc_verified) {
+                    Alert.alert(
+                        "KYC Verified",
+                        "Your KYC verification is already completed!",
+                        [{ text: "OK" }]
+                    );
+                } else {
+                    navigation.navigate('KYCVerification');
+                }
+            }
         },
     ];
 
 
-    const ListEnquiryApi = async (filters = {}) => {
+    const ListCountApi = async (filters = {}) => {
         setLoading(true);
 
         try {
             console.log('📡 API Request:', filters);
 
-            const response = await fetch(`${ApiConstant.URL}${ApiConstant.OtherURL.list_enquiry}`, {
+            const response = await fetch(`${ApiConstant.URL}${ApiConstant.OtherURL.count_view_property}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -100,7 +167,8 @@ const AgentDashboard = () => {
     // ✅ Fetch data every time screen comes into focus
     useFocusEffect(
         useCallback(() => {
-            ListEnquiryApi(); // call your API
+            ListCountApi(); // call your API
+            checkKYCStatus();
         }, [])
     );
 
@@ -254,13 +322,7 @@ const AgentDashboard = () => {
                                 }}>
                                     {stat.title}
                                 </Text>
-                                <Text style={{
-                                    fontSize: 11,
-                                    fontFamily: 'Inter-Bold',
-                                    color: stat.color,
-                                }}>
-                                    {stat.change}
-                                </Text>
+
                             </View>
                         ))}
                     </View>

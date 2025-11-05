@@ -42,7 +42,7 @@ const PropertyListing = () => {
     };
 
     const DeletePropertyApi = async propertyId => {
-        console.log('propertyId', propertyId);
+
         try {
             const response = await fetch(`${ApiConstant.URL}${ApiConstant.OtherURL.delete_property}`, {
                 method: 'POST',
@@ -171,19 +171,20 @@ const PropertyListing = () => {
     // Get status color
     const getStatusColor = (status) => {
         switch (status) {
-            case 'active': return '#4CAF50';
-            case 'sold': return '#2196F3';
-            case 'pending': return '#FF9800';
+            case 'Sold': return '#4CAF50';
+            case 'Available': return '#2196F3';
+            case 'Rented': return '#FF9800';
             default: return '#666';
         }
+
     };
 
     // Get status text
     const getStatusText = (status) => {
         switch (status) {
-            case 'active': return 'Active';
-            case 'sold': return 'Sold';
-            case 'pending': return 'Pending';
+            case 'Sold': return 'Sold';
+            case 'Available': return 'Available';
+            case 'Rented': return 'Rented';
             default: return status;
         }
     };
@@ -501,7 +502,7 @@ const PropertyListing = () => {
                         fontFamily: 'Inter-Bold',
                         color: colors.AppColor,
                     }}>
-                        {item.price ? `₹${Number(item.price).toLocaleString('en-IN')}` : 'Price on Request'}
+                        {item.unit_price ? `₹${Number(item.unit_price).toLocaleString('en-IN')}` : 'Price on Request'}
                     </Text>
                 </View>
 
@@ -783,24 +784,7 @@ const PropertyListing = () => {
                             fontFamily: 'Inter-Bold',
                             color: '#4CAF50',
                         }}>
-                            {listProperty.filter(p => p.p_status === 'active').length}
-                        </Text>
-                        <Text style={{
-                            fontSize: 12,
-                            fontFamily: 'Inter-Regular',
-                            color: '#666',
-                        }}>
-                            Active
-                        </Text>
-                    </View>
-
-                    <View style={{ alignItems: 'center', flex: 1 }}>
-                        <Text style={{
-                            fontSize: 20,
-                            fontFamily: 'Inter-Bold',
-                            color: '#2196F3',
-                        }}>
-                            {listProperty.filter(p => p.p_status === 'sold').length}
+                            {listProperty.filter(p => p.p_status === 'Sold').length}
                         </Text>
                         <Text style={{
                             fontSize: 12,
@@ -815,16 +799,33 @@ const PropertyListing = () => {
                         <Text style={{
                             fontSize: 20,
                             fontFamily: 'Inter-Bold',
-                            color: '#FF9800',
+                            color: '#2196F3',
                         }}>
-                            {listProperty.filter(p => p.p_status === 'pending').length}
+                            {listProperty.filter(p => p.p_status === 'Available').length}
                         </Text>
                         <Text style={{
                             fontSize: 12,
                             fontFamily: 'Inter-Regular',
                             color: '#666',
                         }}>
-                            Pending
+                            Available
+                        </Text>
+                    </View>
+
+                    <View style={{ alignItems: 'center', flex: 1 }}>
+                        <Text style={{
+                            fontSize: 20,
+                            fontFamily: 'Inter-Bold',
+                            color: '#FF9800',
+                        }}>
+                            {listProperty.filter(p => p.p_status === 'Rented').length}
+                        </Text>
+                        <Text style={{
+                            fontSize: 12,
+                            fontFamily: 'Inter-Regular',
+                            color: '#666',
+                        }}>
+                            Rented
                         </Text>
                     </View>
                 </View>
@@ -840,9 +841,9 @@ const PropertyListing = () => {
                 }}>
                     {[
                         { key: 'all', label: 'All' },
-                        { key: 'active', label: 'Active' },
-                        { key: 'sold', label: 'Sold' },
-                        { key: 'pending', label: 'Pending' }
+                        { key: 'Available', label: 'Available' },
+                        { key: 'Sold', label: 'Sold' },
+                        { key: 'Rented', label: 'Rented' }
                     ].map((tab) => (
                         <TouchableOpacity
                             key={tab.key}

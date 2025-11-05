@@ -30,13 +30,13 @@ const PropertyDetail = () => {
     // Sample property data with multiple images and videos
     const propertyData = {
         ...property,
-        images: [
-            'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800',
-            'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=800',
-            'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=800',
-            'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800',
-
-        ],
+        images:
+            property.images && property.images.length > 0
+                ? property.images
+                : [
+                    // 👇 Default fallback if no image from API
+                    'https://cdn-icons-png.flaticon.com/512/814/814513.png'
+                ],
         videos: [
             {
                 id: 1,
@@ -44,20 +44,25 @@ const PropertyDetail = () => {
                 duration: '2:30'
             }
         ],
-        description: 'This luxurious 3BHK apartment offers modern amenities and premium finishes. Located in the heart of Sector 15, it provides easy access to schools, hospitals, and shopping centers. The apartment features spacious rooms, modular kitchen, and beautiful flooring throughout.',
-        amenities: ['Swimming Pool', 'Gym', 'Parking', 'Security', 'Power Backup', 'Lift', 'Garden', 'Club House'],
+        description:
+            property.description ||
+            'No description available for this property.', amenities: property.amenities && property.amenities.length > 0
+                ? property.amenities.split(',').map(a => a.trim())
+                : ['No amenities listed'],
         specifications: [
-            { label: 'Carpet Area', value: '1650 sq ft' },
-            { label: 'Built-up Area', value: '1800 sq ft' },
-            { label: 'Floor', value: '12th' },
-            { label: 'Total Floors', value: '15' },
-            { label: 'Furnishing', value: 'Semi-Furnished' },
-            { label: 'Age', value: '2 Years' },
+            { label: 'Type', value: property.type || 'N/A' },
+            { label: 'Status', value: property.p_status || 'N/A' },
+            { label: 'Budget', value: property.budget || 'N/A' },
+            { label: 'Size', value: property.size ? `${property.size} sq ft` : 'N/A' },
+            { label: 'Location', value: property.location || 'N/A' },
+            { label: 'Entry Date', value: property.entry_date || 'N/A' },
+            { label: 'City', value: property.city_name || 'N/A' },
         ],
+
         location: {
             latitude: 28.4595,
             longitude: 77.0266,
-            address: 'Sector 15, Gurgaon, Haryana 122001'
+            address: property.location
         },
         owner: {
             name: 'Rajesh Kumar',
@@ -254,7 +259,7 @@ const PropertyDetail = () => {
                     </Text>
 
                     {/* Property Features */}
-                    <View style={{
+                    {/* <View style={{
                         flexDirection: 'row',
                         justifyContent: 'space-around',
                         borderTopWidth: 1,
@@ -310,7 +315,7 @@ const PropertyDetail = () => {
                                 {propertyData.type}
                             </Text>
                         </View>
-                    </View>
+                    </View> */}
                 </View>
 
                 {/* Description */}

@@ -21,7 +21,6 @@ import ApiConstant from '../constants/ApiConstant';
 
 const AgentAddProperty = () => {
     const navigation = useNavigation();
-
     const route = useRoute();
     const { property } = route.params || {};
 
@@ -43,16 +42,15 @@ const AgentAddProperty = () => {
 
     const [budget, setBudget] = useState('');
     const [mapLocation, setMapLocation] = useState('');
-    const [propertyStatus, setPropertyStatus] = useState('pending');
+    const [propertyStatus, setPropertyStatus] = useState('Available');
     const [budgetDropdownVisible, setBudgetDropdownVisible] = useState(false);
 
-
-
-
-    // Media states
+    // ✅ Media states with base64 support
     const [photos, setPhotos] = useState([]);
     const [videos, setVideos] = useState([]);
     const [uploading, setUploading] = useState(false);
+
+    const [errors, setErrors] = useState({});
 
     // Available amenities
     const availableAmenities = [
@@ -60,9 +58,9 @@ const AgentAddProperty = () => {
         'Lift', 'Power Backup', 'Water Supply', 'Park', 'Club House'
     ];
 
-    const statusOptions = ['pending', 'active', 'sold'];
-
+    const statusOptions = ['Available', 'Sold', 'Rented'];
     const budgetOptions = ['10L-20L', '20L-30L', '30L-40L', '40L-50L', '50L-60L', '60L-70L', '70L-80L', '80L-90L', '90L-1Cr', '1Cr+'];
+
     // Toggle amenity selection
     const toggleAmenity = (amenity) => {
         if (amenities.includes(amenity)) {
@@ -99,13 +97,11 @@ const AgentAddProperty = () => {
 
             // ✅ Location Details
             setLocation(property.location || '');
-            setCity(property.city || property.city_name || '');
-            // setPincode(property.pincode || '');
-
-            // ✅ Additional Fields
+            setCity(property.city || property.city || '');
             setBudget(property.budget || '');
             setMapLocation(property.map || '');
             setPropertyStatus(property.p_status || 'pending');
+
 
             // ✅ Amenities - agar string mein hai toh array mein convert karein
             if (property.amenities) {
@@ -116,31 +112,33 @@ const AgentAddProperty = () => {
                 }
             }
 
-            // ✅ Media - Images aur Videos
-            if (property.images && Array.isArray(property.images)) {
-                const formattedPhotos = property.images.map((image, index) => ({
-                    id: `existing_photo_${index}`,
-                    uri: image,
-                    type: 'existing'
-                }));
-                setPhotos(formattedPhotos);
-            }
-
-            if (property.videos && Array.isArray(property.videos)) {
-                const formattedVideos = property.videos.map((video, index) => ({
-                    id: `existing_video_${index}`,
-                    uri: video,
-                    type: 'existing'
-                }));
-                setVideos(formattedVideos);
-            }
-
             console.log('Form prefilled for editing');
         }
     }, [property, listCategory]);
 
-    // Handle photo upload (simulated)
-    // ✅ Real Photo Upload with ImageCropPicker
+    // ✅ Convert image to base64 format
+    const convertImageToBase64 = async (imageUri) => {
+        try {
+            const response = await fetch(imageUri);
+            const blob = await response.blob();
+
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    // Remove data:image/jpeg;base64, prefix if present
+                    const base64 = reader.result.split(',')[1];
+                    resolve(base64);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        } catch (error) {
+            console.log('Error converting image to base64:', error);
+            throw error;
+        }
+    };
+
+    // ✅ Handle photo upload with base64 conversion
     const handlePhotoUpload = async () => {
         if (photos.length >= 10) {
             Alert.alert('Limit Reached', 'You can upload maximum 10 photos');
@@ -153,22 +151,38 @@ const AgentAddProperty = () => {
                 multiple: true,
                 maxFiles: 10 - photos.length,
                 cropping: true,
-                compressImageQuality: 0.8,
-                includeBase64: false,
+                compressImageQuality: 0.7, // Quality reduce karo for smaller size
+                compressImageMaxWidth: 1024, // Max width limit
+                compressImageMaxHeight: 1024, // Max height limit
+                includeBase64: true, // ✅ Direct base64 lelo
             });
 
             // Handle single or multiple images
             const selectedImages = Array.isArray(image) ? image : [image];
 
-            const newPhotos = selectedImages.map((img, index) => ({
-                id: Date.now() + index,
-                uri: img.path,
-                width: img.width,
-                height: img.height,
-                mime: img.mime,
-            }));
+            const newPhotos = await Promise.all(
+                selectedImages.map(async (img, index) => {
+                    // Agar ImagePicker se direct base64 mil raha hai toh use karo
+                    let base64Data = img.data;
+
+                    // Agar base64 nahi mila toh manually convert karo
+                    if (!base64Data) {
+                        base64Data = await convertImageToBase64(img.path);
+                    }
+
+                    return {
+                        id: Date.now() + index,
+                        uri: img.path,
+                        base64: base64Data,
+                        mime: img.mime || 'image/jpeg',
+                        width: img.width,
+                        height: img.height,
+                    };
+                })
+            );
 
             setPhotos([...photos, ...newPhotos]);
+            ToastAndroid.show(`${selectedImages.length} photo(s) added`, ToastAndroid.SHORT);
 
         } catch (error) {
             if (error.code !== 'E_PICKER_CANCELLED') {
@@ -178,39 +192,7 @@ const AgentAddProperty = () => {
         }
     };
 
-    // Handle video upload (simulated)
-    // ✅ Real Video Upload with ImageCropPicker
-    const handleVideoUpload = async () => {
-        if (videos.length >= 3) {
-            Alert.alert('Limit Reached', 'You can upload maximum 3 videos');
-            return;
-        }
-
-        try {
-            const video = await ImagePicker.openPicker({
-                mediaType: 'video',
-                multiple: false, // Single video selection
-                compressVideoPreset: 'MediumQuality',
-            });
-
-            const newVideo = {
-                id: Date.now(),
-                uri: video.path,
-                duration: video.duration,
-                size: video.size,
-                mime: video.mime,
-            };
-
-            setVideos([...videos, newVideo]);
-
-        } catch (error) {
-            if (error.code !== 'E_PICKER_CANCELLED') {
-                Alert.alert('Error', 'Failed to select video');
-                console.log('Video picker error:', error);
-            }
-        }
-    };
-    // ✅ Camera se directly photo lena
+    // ✅ Camera se directly photo lena with base64
     const handleTakePhoto = async () => {
         if (photos.length >= 10) {
             Alert.alert('Limit Reached', 'You can upload maximum 10 photos');
@@ -221,92 +203,145 @@ const AgentAddProperty = () => {
             const image = await ImagePicker.openCamera({
                 mediaType: 'photo',
                 cropping: true,
-                compressImageQuality: 0.8,
+                compressImageQuality: 0.7,
+                compressImageMaxWidth: 1024,
+                compressImageMaxHeight: 1024,
+                includeBase64: true, // ✅ Direct base64
             });
+
+            let base64Data = image.data;
+            if (!base64Data) {
+                base64Data = await convertImageToBase64(image.path);
+            }
 
             const newPhoto = {
                 id: Date.now(),
                 uri: image.path,
+                base64: base64Data,
+                mime: image.mime || 'image/jpeg',
                 width: image.width,
                 height: image.height,
-                mime: image.mime,
             };
 
             setPhotos([...photos, newPhoto]);
+            ToastAndroid.show('Photo taken successfully', ToastAndroid.SHORT);
 
         } catch (error) {
             if (error.code !== 'E_PICKER_CANCELLED') {
                 Alert.alert('Error', 'Failed to take photo');
+                console.log('Camera error:', error);
             }
         }
     };
 
-    // Remove media item
-    // ✅ Existing media remove karte time check karein
+    // ✅ Handle video upload (base64 format mein)
+    const handleVideoUpload = async () => {
+        if (videos.length >= 3) {
+            Alert.alert('Limit Reached', 'You can upload maximum 3 videos');
+            return;
+        }
+
+        try {
+            const video = await ImagePicker.openPicker({
+                mediaType: 'video',
+                multiple: false,
+                compressVideoPreset: 'MediumQuality',
+            });
+
+            // Video ko base64 mein convert karo
+            const videoBase64 = await convertImageToBase64(video.path);
+
+            const newVideo = {
+                id: Date.now(),
+                uri: video.path,
+                base64: videoBase64,
+                duration: video.duration,
+                size: video.size,
+                mime: video.mime || 'video/mp4',
+            };
+
+            setVideos([...videos, newVideo]);
+            ToastAndroid.show('Video added successfully', ToastAndroid.SHORT);
+
+        } catch (error) {
+            if (error.code !== 'E_PICKER_CANCELLED') {
+                Alert.alert('Error', 'Failed to select video');
+                console.log('Video picker error:', error);
+            }
+        }
+    };
+
+    // ✅ Remove media item
     const removeMedia = (id, type) => {
         if (type === 'photo') {
             const updatedPhotos = photos.filter(photo => photo.id !== id);
             setPhotos(updatedPhotos);
-
-            // ✅ Agar existing photo delete ho rahi hai toh backend ko batao
-            if (id.includes('existing_photo')) {
-                console.log('Existing photo removed:', id);
-                // Yahan backend API call kar sakte hain specific photo delete karne ke liye
-            }
+            ToastAndroid.show('Photo removed', ToastAndroid.SHORT);
         } else {
             const updatedVideos = videos.filter(video => video.id !== id);
             setVideos(updatedVideos);
-
-            if (id.includes('existing_video')) {
-                console.log('Existing video removed:', id);
-            }
+            ToastAndroid.show('Video removed', ToastAndroid.SHORT);
         }
     };
 
-
     // ✅ Reset Form Function
     const resetForm = () => {
-        // Basic Information
         setTitle('');
         setDescription('');
         setPrice('');
         setArea('');
         setBedrooms('');
         setBathrooms('');
-
-        // Property Type & Category
         setPropertyType('Residential');
         setSelectedCategory(null);
-
-        // Location Details
         setLocation('');
         setCity('');
-        // setPincode('');
-
-        // Additional Fields
         setBudget('');
         setMapLocation('');
         setPropertyStatus('pending');
-
-        // Amenities
         setAmenities([]);
-
-        // Media
         setPhotos([]);
         setVideos([]);
-
-        // Dropdown States
         setDropdownVisible(false);
         setBudgetDropdownVisible(false);
-
         console.log('Form reset successfully');
     };
 
-    // ✅ Alternative: JSON format mein data bhejna hai toh
+    // ✅ Validate Form
+    const validateForm = () => {
+        let tempErrors = {};
+
+        if (!selectedCategory) tempErrors.category = 'Please select category';
+        if (!title.trim()) tempErrors.title = 'Please enter property title';
+        if (!price.trim()) tempErrors.price = 'Please enter property price';
+        if (!location.trim()) tempErrors.location = 'Please enter property location';
+        if (!city.trim()) tempErrors.city = 'Please enter city';
+        if (photos.length === 0) tempErrors.photos = 'Please add at least one photo';
+
+        setErrors(tempErrors);
+
+        // agar koi error hai to false return kar
+        return Object.keys(tempErrors).length === 0;
+    };
+
+
+    // ✅ Main Submit Function with Base64 Array
     const handleSubmit = async () => {
+        if (!validateForm()) return;
+
         setUploading(true);
 
         try {
+            // ✅ Prepare photos array in base64 format
+            const photosBase64Array = photos.map(photo =>
+                `data:${photo.mime};base64,${photo.base64}`
+            );
+
+            // ✅ Prepare videos array in base64 format
+            const videosBase64Array = videos.map(video =>
+                `data:${video.mime};base64,${video.base64}`
+            );
+
             // ✅ Prepare JSON data
             const propertyData = {
                 // ✅ Edit mode mein p_id add karein
@@ -323,11 +358,16 @@ const AgentAddProperty = () => {
                 size: area,
                 map: mapLocation,
                 p_status: propertyStatus,
-                p_image: photos.map(photo => photo.uri),
-                p_video: videos.map(video => video.uri)
+                p_image: photosBase64Array, // ✅ Base64 array
+                p_video: videosBase64Array  // ✅ Base64 array
             };
 
-            console.log('Sending JSON Data:', propertyData);
+            console.log('📤 Sending Property Data with Images:', {
+                ...propertyData,
+                p_image: `${photosBase64Array.length} images`,
+                p_video: `${videosBase64Array.length} videos`
+            });
+
             const endpoint = property
                 ? `${ApiConstant.URL}${ApiConstant.OtherURL.update_property}`
                 : `${ApiConstant.URL}${ApiConstant.OtherURL.add_property}`;
@@ -342,7 +382,7 @@ const AgentAddProperty = () => {
             });
 
             const result = await response.json();
-            console.log('API Response:', result);
+            console.log('📥 API Response:', result);
 
             if (result.code === 200) {
                 const successMessage = property
@@ -352,7 +392,7 @@ const AgentAddProperty = () => {
                 ToastAndroid.show(successMessage, ToastAndroid.LONG);
 
                 if (!property) {
-                    resetForm(); // Sirf add mode mein reset karein
+                    resetForm();
                 }
 
                 navigation.goBack();
@@ -361,7 +401,7 @@ const AgentAddProperty = () => {
             }
 
         } catch (error) {
-            console.log('Error adding property:', error);
+            console.log('❌ Error adding property:', error);
             ToastAndroid.show('Network error occurred', ToastAndroid.LONG);
         } finally {
             setUploading(false);
@@ -396,17 +436,14 @@ const AgentAddProperty = () => {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-                {/* ✅ Header Component Use Karein */}
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps='handled'>
                 <Header
                     title={property ? "Edit Property" : "Add Property"}
                     onBackPress={() => navigation.goBack()}
                 />
 
                 <View style={{ padding: 20 }}>
-
-                    {/* ✅ Category Dropdown - Normal Style */}
-                    {/* ✅ Category Dropdown with Absolute Positioning */}
+                    {/* ✅ Category Dropdown */}
                     <Text style={{
                         fontSize: 16,
                         fontFamily: 'Inter-Medium',
@@ -416,9 +453,7 @@ const AgentAddProperty = () => {
                         Category *
                     </Text>
 
-                    {/* Dropdown Container with Relative Positioning */}
                     <View style={{ position: 'relative', marginBottom: 20 }}>
-                        {/* Dropdown Trigger */}
                         <TouchableOpacity
                             style={{
                                 borderWidth: 1,
@@ -448,11 +483,10 @@ const AgentAddProperty = () => {
                             />
                         </TouchableOpacity>
 
-                        {/* Dropdown List - Absolute Position */}
                         {dropdownVisible && (
                             <View style={{
                                 position: 'absolute',
-                                top: 55, // Trigger ke height ke according
+                                top: 55,
                                 left: 0,
                                 right: 0,
                                 borderWidth: 1,
@@ -465,7 +499,7 @@ const AgentAddProperty = () => {
                                 shadowOffset: { width: 0, height: 2 },
                                 shadowOpacity: 0.25,
                                 shadowRadius: 3.84,
-                                zIndex: 1000, // High z-index
+                                zIndex: 1000,
                             }}>
                                 <FlatList
                                     data={listCategory}
@@ -499,6 +533,7 @@ const AgentAddProperty = () => {
                         )}
                     </View>
 
+                    {/* Rest of your existing UI components remain same */}
                     {/* Property Type Selection */}
                     <Text style={{
                         fontSize: 16,
@@ -586,7 +621,7 @@ const AgentAddProperty = () => {
                         </TouchableOpacity>
                     </View>
 
-                    {/* Basic Information */}
+                    {/* Basic Information Section */}
                     <Text style={{
                         fontSize: 18,
                         fontFamily: 'Inter-Bold',
@@ -599,7 +634,7 @@ const AgentAddProperty = () => {
                     {/* Title */}
                     <View style={{
                         borderWidth: 1,
-                        borderColor: '#ddd',
+                        borderColor: errors.title ? 'red' : '#ccc',
                         borderRadius: 8,
                         backgroundColor: '#f9f9f9',
                         paddingHorizontal: 12,
@@ -615,8 +650,12 @@ const AgentAddProperty = () => {
                             placeholder="Property Title *"
                             placeholderTextColor={colors.PlaceHolderTextcolor}
                             value={title}
-                            onChangeText={setTitle}
+                            onChangeText={(text) => {
+                                setTitle(text);
+                                setErrors(prev => ({ ...prev, title: '' })); // remove error on typing
+                            }}
                         />
+                        {errors.title && <Text style={{ color: 'red', fontSize: 12 }}>{errors.title}</Text>}
                     </View>
 
                     {/* Description */}
@@ -666,7 +705,10 @@ const AgentAddProperty = () => {
                                 placeholder="Price *"
                                 placeholderTextColor={colors.PlaceHolderTextcolor}
                                 value={price}
-                                onChangeText={setPrice}
+                                onChangeText={(text) => {
+                                    setPrice(text);
+                                    setErrors(prev => ({ ...prev, price: '' })); // remove error on typing
+                                }}
                                 keyboardType="numeric"
                             />
                         </View>
@@ -693,7 +735,6 @@ const AgentAddProperty = () => {
                             />
                         </View>
                     </View>
-
 
                     {/* ✅ Budget Dropdown */}
                     <Text style={{
@@ -805,37 +846,37 @@ const AgentAddProperty = () => {
                         <TouchableOpacity
                             style={{
                                 paddingVertical: 12,
-                                backgroundColor: propertyStatus === 'pending' ? '#007AFF' : '#fff',
+                                backgroundColor: propertyStatus === 'Available' ? '#007AFF' : '#fff',
                                 width: '33.33%',
                                 justifyContent: 'center',
                                 alignItems: 'center'
                             }}
-                            onPress={() => setPropertyStatus('pending')}
+                            onPress={() => setPropertyStatus('Available')}
                         >
                             <Text style={{
-                                color: propertyStatus === 'pending' ? '#fff' : '#007AFF',
+                                color: propertyStatus === 'Available' ? '#fff' : '#007AFF',
                                 fontFamily: 'Inter-Bold',
                                 fontSize: 12
                             }}>
-                                Rented
+                                Available
                             </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={{
                                 paddingVertical: 12,
-                                backgroundColor: propertyStatus === 'active' ? '#007AFF' : '#fff',
+                                backgroundColor: propertyStatus === 'Rented' ? '#007AFF' : '#fff',
                                 width: '33.33%',
                                 justifyContent: 'center',
                                 alignItems: 'center'
                             }}
-                            onPress={() => setPropertyStatus('active')}
+                            onPress={() => setPropertyStatus('Rented')}
                         >
                             <Text style={{
-                                color: propertyStatus === 'active' ? '#fff' : '#007AFF',
+                                color: propertyStatus === 'Rented' ? '#fff' : '#007AFF',
                                 fontFamily: 'Inter-Bold',
                                 fontSize: 12
                             }}>
-                                Active
+                                Rented
                             </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -857,54 +898,6 @@ const AgentAddProperty = () => {
                             </Text>
                         </TouchableOpacity>
                     </View>
-
-                    {/* Bedrooms and Bathrooms Row */}
-                    {/* <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
-                        <View style={{
-                            borderWidth: 1,
-                            borderColor: '#ddd',
-                            borderRadius: 8,
-                            backgroundColor: '#f9f9f9',
-                            paddingHorizontal: 12,
-                            width: '48%',
-                        }}>
-                            <TextInput
-                                style={{
-                                    paddingVertical: 12,
-                                    fontSize: 16,
-                                    fontFamily: 'Inter-Medium',
-                                    color: colors.TextColorBlack,
-                                }}
-                                placeholder="Bedrooms"
-                                placeholderTextColor={colors.PlaceHolderTextcolor}
-                                value={bedrooms}
-                                onChangeText={setBedrooms}
-                                keyboardType="numeric"
-                            />
-                        </View>
-                        <View style={{
-                            borderWidth: 1,
-                            borderColor: '#ddd',
-                            borderRadius: 8,
-                            backgroundColor: '#f9f9f9',
-                            paddingHorizontal: 12,
-                            width: '48%',
-                        }}>
-                            <TextInput
-                                style={{
-                                    paddingVertical: 12,
-                                    fontSize: 16,
-                                    fontFamily: 'Inter-Medium',
-                                    color: colors.TextColorBlack,
-                                }}
-                                placeholder="Bathrooms"
-                                placeholderTextColor={colors.PlaceHolderTextcolor}
-                                value={bathrooms}
-                                onChangeText={setBathrooms}
-                                keyboardType="numeric"
-                            />
-                        </View>
-                    </View> */}
 
                     {/* Location Details */}
                     <Text style={{
@@ -935,7 +928,10 @@ const AgentAddProperty = () => {
                             placeholderTextColor={colors.PlaceHolderTextcolor}
                             value={location}
                             multiline={true}
-                            onChangeText={setLocation}
+                            onChangeText={(text) => {
+                                setLocation(text);
+                                setErrors(prev => ({ ...prev, location: '' })); // remove error on typing
+                            }}
                         />
                     </View>
 
@@ -958,32 +954,12 @@ const AgentAddProperty = () => {
                                 placeholder="City *"
                                 placeholderTextColor={colors.PlaceHolderTextcolor}
                                 value={city}
-                                onChangeText={setCity}
+                                onChangeText={(text) => {
+                                    setCity(text);
+                                    setErrors(prev => ({ ...prev, city: '' })); // remove error on typing
+                                }}
                             />
                         </View>
-                        {/* <View style={{
-                            borderWidth: 1,
-                            borderColor: '#ddd',
-                            borderRadius: 8,
-                            backgroundColor: '#f9f9f9',
-                            paddingHorizontal: 12,
-                            width: '48%',
-                        }}>
-                            <TextInput
-                                style={{
-                                    paddingVertical: 12,
-                                    fontSize: 16,
-                                    fontFamily: 'Inter-Medium',
-                                    color: colors.TextColorBlack,
-                                }}
-                                placeholder="Pincode"
-                                placeholderTextColor={colors.PlaceHolderTextcolor}
-                                value={pincode}
-                                onChangeText={setPincode}
-                                keyboardType="numeric"
-                                maxLength={6}
-                            />
-                        </View> */}
                     </View>
 
                     {/* Amenities */}
@@ -1028,6 +1004,7 @@ const AgentAddProperty = () => {
                         ))}
                     </View>
 
+                    {/* ✅ Media Upload Section */}
                     <Text style={{
                         fontSize: 18,
                         fontFamily: 'Inter-Bold',
@@ -1206,10 +1183,11 @@ const AgentAddProperty = () => {
 
                     {/* Submit Button */}
                     <CustomButton
-                        title={property ? "Update Property" : "Add Property"}
+                        title={uploading ? "Uploading..." : (property ? "Update Property" : "Add Property")}
                         onPress={handleSubmit}
                         variant="primary"
                         size="large"
+                        disabled={uploading}
                     />
 
                 </View>

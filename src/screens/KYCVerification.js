@@ -23,8 +23,11 @@ import ApiConstant from '../constants/ApiConstant'
 const KYCVerification = () => {
     const navigation = useNavigation()
 
-    // ✅ Array format mein documents
-    const [idProof, setIdProof] = useState([])
+    // ✅ Separate states for each document
+    const [aadharFront, setAadharFront] = useState(null)
+    const [aadharBack, setAadharBack] = useState(null)
+    const [panCard, setPanCard] = useState(null)
+
     const [errors, setErrors] = useState({})
 
     // ✅ Modal states
@@ -41,17 +44,23 @@ const KYCVerification = () => {
         {
             id: 'aadhar_front',
             title: 'Aadhar Card Front',
-            required: true
+            required: true,
+            state: aadharFront,
+            setState: setAadharFront
         },
         {
             id: 'aadhar_back',
             title: 'Aadhar Card Back',
-            required: true
+            required: true,
+            state: aadharBack,
+            setState: setAadharBack
         },
         {
             id: 'pan_card',
             title: 'PAN Card',
-            required: true
+            required: true,
+            state: panCard,
+            setState: setPanCard
         }
     ]
 
@@ -90,7 +99,7 @@ const KYCVerification = () => {
 
     // ✅ Handle Image Selection
     const handleImagePick = async (image) => {
-        if (!image?.path) return
+        if (!image?.path) return;
 
         const documentData = {
             id: currentImageType.id,
@@ -98,30 +107,19 @@ const KYCVerification = () => {
             title: currentImageType.title,
             uri: image.path,
             name: `${currentImageType.id}_${Date.now()}.jpg`,
-            mime: image.mime
-        }
+            mime: image.mime || 'image/jpeg',
+            base64: image.data || '',  // 👈 store base64 here
+        };
 
-        // ✅ Check if document already exists, if yes replace it
-        const existingIndex = idProof.findIndex(doc => doc.id === currentImageType.id)
+        // ✅ Update the specific state
+        currentImageType.setState(documentData);
 
-        if (existingIndex !== -1) {
-            const updatedProof = [...idProof]
-            updatedProof[existingIndex] = documentData
-            setIdProof(updatedProof)
-        } else {
-            setIdProof(prev => [...prev, documentData])
-        }
-
-        // Clear error
         if (errors[currentImageType.id]) {
-            setErrors(prev => ({
-                ...prev,
-                [currentImageType.id]: ''
-            }))
+            setErrors(prev => ({ ...prev, [currentImageType.id]: '' }));
         }
 
-        closeImageSelectModal()
-    }
+        closeImageSelectModal();
+    };
 
     // ✅ Open Gallery
     const openGallery = async () => {
@@ -134,6 +132,7 @@ const KYCVerification = () => {
                 compressImageMaxWidth: 500,
                 compressImageMaxHeight: 500,
                 compressImageQuality: 0.7,
+                includeBase64: true,
             })
             await handleImagePick(image)
         } catch (error) {
@@ -160,6 +159,7 @@ const KYCVerification = () => {
                 compressImageMaxWidth: 500,
                 compressImageMaxHeight: 500,
                 compressImageQuality: 0.7,
+                includeBase64: true,
             })
             await handleImagePick(image)
         } catch (error) {
@@ -168,14 +168,9 @@ const KYCVerification = () => {
         }
     }
 
-    // ✅ Get document by type
-    const getDocumentByType = (docTypeId) => {
-        return idProof.find(doc => doc.id === docTypeId)
-    }
-
     // ✅ Remove Image
-    const removeImage = (docTypeId) => {
-        setIdProof(prev => prev.filter(doc => doc.id !== docTypeId))
+    const removeImage = (docType) => {
+        docType.setState(null);
     }
 
     // ✅ Preview Image
@@ -190,7 +185,7 @@ const KYCVerification = () => {
         const newErrors = {}
 
         documentTypes.forEach(docType => {
-            if (docType.required && !getDocumentByType(docType.id)) {
+            if (docType.required && !docType.state) {
                 newErrors[docType.id] = `${docType.title} is required`
             }
         })
@@ -200,42 +195,33 @@ const KYCVerification = () => {
     }
 
     // ✅ Submit KYC
-    // ✅ Submit KYC with comprehensive error handling
-
-    // ✅ CORRECTED SUBMIT KYC FUNCTION
     const handleSubmit = async () => {
         try {
             setUploading(true);
 
-            // ✅ Get staff ID from AsyncStorage
             const staffId = await AsyncStorage.getItem('id');
-            if (!staffId) {
-                ToastAndroid.show('Staff ID not found. Please login again.', ToastAndroid.LONG);
-                setUploading(false);
+            // ✅ First validate the form
+            if (!validateForm()) {
+                ToastAndroid.show('Please upload all required documents', ToastAndroid.LONG);
                 return;
             }
 
-            // ✅ Validate ID Proofs
-            if (!idProof || idProof.length === 0) {
-                ToastAndroid.show('Please upload at least one document', ToastAndroid.LONG);
-                setUploading(false);
-                return;
-            }
 
-            // ✅ Prepare JSON payload
+
+            // ✅ Prepare final array in required format
+            const idProofArray = [
+                `data:${aadharFront.mime};base64,${aadharFront.base64}`,
+                `data:${aadharBack.mime};base64,${aadharBack.base64}`,
+                `data:${panCard.mime};base64,${panCard.base64}`,
+            ];
+
             const payload = {
                 staff_id: staffId,
-                documents: idProof.map((doc, index) => ({
-                    name: doc.name || `document_${index}.jpg`,
-                    type: doc.mime || 'image/jpeg',
-                    base64: doc.base64 || '', // 👈 make sure you have base64 data
-                })),
-                upload_date: new Date().toISOString(),
+                id_proof: idProofArray,
             };
 
-            console.log('📤 Sending Payload:', payload);
+            console.log('📤 Final Payload:', JSON.stringify(payload, null, 2));
 
-            // ✅ Send to API
             const response = await fetch(`${ApiConstant.URL}${ApiConstant.OtherURL.add_kyc}`, {
                 method: 'POST',
                 headers: {
@@ -244,15 +230,15 @@ const KYCVerification = () => {
                 body: JSON.stringify(payload),
             });
 
-            // ✅ Parse response safely
             const text = await response.text();
             const result = text ? JSON.parse(text) : {};
             console.log('📥 Response:', result);
 
-            // ✅ Handle result
             if (result.code === 200) {
                 ToastAndroid.show('KYC submitted successfully!', ToastAndroid.LONG);
-                setIdProof([]);
+                setAadharFront(null);
+                setAadharBack(null);
+                setPanCard(null);
                 navigation.goBack();
             } else {
                 ToastAndroid.show(result.message || 'Submission failed', ToastAndroid.LONG);
@@ -266,10 +252,9 @@ const KYCVerification = () => {
     };
 
 
-
     // ✅ Render Document Upload Field
     const renderDocumentField = (docType) => {
-        const document = getDocumentByType(docType.id)
+        const document = docType.state;
 
         return (
             <View style={{ marginBottom: 20 }}>
@@ -321,7 +306,7 @@ const KYCVerification = () => {
 
                             <TouchableOpacity
                                 style={{ padding: 8, marginLeft: 5 }}
-                                onPress={() => removeImage(docType.id)}
+                                onPress={() => removeImage(docType)}
                             >
                                 <Ionicons name="close-circle-outline" size={20} color="#FF3B30" />
                             </TouchableOpacity>
