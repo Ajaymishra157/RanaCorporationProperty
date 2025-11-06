@@ -26,69 +26,121 @@ const PropertyDetail = () => {
     const scrollViewRef = useRef();
     const autoScrollRef = useRef();
 
+    // ✅ CORRECTLY EXTRACT IMAGES FROM PROPERTY DATA
+    const getPropertyImages = () => {
+        if (!property.images || property.images.length === 0) {
+            return ['https://cdn-icons-png.flaticon.com/512/814/814513.png'];
+        }
 
-    // Sample property data with multiple images and videos
+        // ✅ Check if images is array of objects (with img_file property)
+        if (typeof property.images[0] === 'object' && property.images[0].img_file) {
+            return property.images.map(imgObj => imgObj.img_file);
+        }
+
+        // ✅ Check if images is array of strings
+        if (typeof property.images[0] === 'string') {
+            return property.images;
+        }
+
+        // ✅ Fallback
+        return ['https://cdn-icons-png.flaticon.com/512/814/814513.png'];
+    };
+
+    // ✅ CORRECTLY EXTRACT AMENITIES
+    const getPropertyAmenities = () => {
+        if (!property.amenities) {
+            return ['No amenities listed'];
+        }
+
+        if (typeof property.amenities === 'string') {
+            return property.amenities.split(',').map(a => a.trim()).filter(a => a.length > 0);
+        }
+
+        if (Array.isArray(property.amenities)) {
+            return property.amenities;
+        }
+
+        return ['No amenities listed'];
+    };
+
+    // ✅ CORRECTLY FORMAT PRICE
+    const getFormattedPrice = () => {
+        if (property.unit_price) {
+            return `₹${Number(property.unit_price).toLocaleString()}`;
+        }
+        if (property.price) {
+            return `₹${Number(property.price).toLocaleString()}`;
+        }
+        return 'Price not available';
+    };
+
+    // ✅ CORRECTLY FORMAT TITLE
+    const getPropertyTitle = () => {
+        return property.product_name || property.title || 'Property Title Not Available';
+    };
+
+    // ✅ CORRECTLY FORMAT DESCRIPTION
+    const getPropertyDescription = () => {
+        return property.description || 'No description available for this property.';
+    };
+
+    // ✅ Process property data
     const propertyData = {
-        ...property,
-        images:
-            property.images && property.images.length > 0
-                ? property.images
-                : [
-                    // 👇 Default fallback if no image from API
-                    'https://cdn-icons-png.flaticon.com/512/814/814513.png'
-                ],
-        videos: [
-            {
-                id: 1,
-                thumbnail: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800',
-                duration: '2:30'
-            }
-        ],
-        description:
-            property.description ||
-            'No description available for this property.', amenities: property.amenities && property.amenities.length > 0
-                ? property.amenities.split(',').map(a => a.trim())
-                : ['No amenities listed'],
+        title: getPropertyTitle(),
+        price: getFormattedPrice(),
+        description: getPropertyDescription(),
+        images: getPropertyImages(),
+        amenities: getPropertyAmenities(),
         specifications: [
             { label: 'Type', value: property.type || 'N/A' },
             { label: 'Status', value: property.p_status || 'N/A' },
             { label: 'Budget', value: property.budget || 'N/A' },
             { label: 'Size', value: property.size ? `${property.size} sq ft` : 'N/A' },
             { label: 'Location', value: property.location || 'N/A' },
-            { label: 'Entry Date', value: property.entry_date || 'N/A' },
+            { label: 'Entry Date', value: property.entry_date ? new Date(property.entry_date).toLocaleDateString() : 'N/A' },
             { label: 'City', value: property.city_name || 'N/A' },
+            { label: 'State', value: property.state_name || 'N/A' },
         ],
-
         location: {
-            latitude: 28.4595,
-            longitude: 77.0266,
-            address: property.location
+            latitude: property.latitude || 28.4595,
+            longitude: property.longitude || 77.0266,
+            address: property.location || 'Location not available'
         },
         owner: {
             name: 'Rajesh Kumar',
             phone: '+91 9876543210',
             email: 'rajesh.kumar@example.com'
         },
-        postedDate: 'January 15, 2024'
+        postedDate: property.entry_date ? new Date(property.entry_date).toLocaleDateString() : 'N/A'
     };
 
+    // Debug logging
+    useEffect(() => {
+        console.log('📸 Property Images:', propertyData.images);
+        console.log('💰 Property Price:', propertyData.price);
+        console.log('🏠 Property Title:', propertyData.title);
+        console.log('📍 Property Location:', propertyData.location);
+    }, []);
 
     // Auto scroll effect
     useEffect(() => {
         const autoScroll = () => {
-            const nextIndex = (activeImageIndex + 1) % propertyData.images.length;
-            scrollToImage(nextIndex);
+            if (propertyData.images.length > 1) {
+                const nextIndex = (activeImageIndex + 1) % propertyData.images.length;
+                scrollToImage(nextIndex);
+            }
         };
 
-        // 3 seconds ke baad automatically next image
-        autoScrollRef.current = setTimeout(autoScroll, 3000);
+        if (propertyData.images.length > 1) {
+            autoScrollRef.current = setTimeout(autoScroll, 3000);
+        }
 
         return () => {
             if (autoScrollRef.current) {
                 clearTimeout(autoScrollRef.current);
             }
         };
-    }, [activeImageIndex]);
+    }, [activeImageIndex, propertyData.images.length]);
 
     // Handle image scroll
     const handleImageScroll = (event) => {
@@ -100,13 +152,15 @@ const PropertyDetail = () => {
         if (autoScrollRef.current) {
             clearTimeout(autoScrollRef.current);
         }
-        autoScrollRef.current = setTimeout(() => {
-            const nextIndex = (index + 1) % propertyData.images.length;
-            scrollToImage(nextIndex);
-        }, 3000);
+
+        if (propertyData.images.length > 1) {
+            autoScrollRef.current = setTimeout(() => {
+                const nextIndex = (index + 1) % propertyData.images.length;
+                scrollToImage(nextIndex);
+            }, 3000);
+        }
     }
 
-    // Scroll to specific image
     // Scroll to specific image
     const scrollToImage = (index) => {
         setActiveImageIndex(index);
@@ -145,64 +199,91 @@ const PropertyDetail = () => {
                         onScroll={handleImageScroll}
                         scrollEventThrottle={16}
                         onTouchStart={() => {
-                            // User touch kare toh auto scroll stop ho jaye
                             if (autoScrollRef.current) {
                                 clearTimeout(autoScrollRef.current);
                             }
                         }}
                         onTouchEnd={() => {
-                            // User touch khatam hone ke 3 seconds baad auto scroll restart
-                            autoScrollRef.current = setTimeout(() => {
-                                const nextIndex = (activeImageIndex + 1) % propertyData.images.length;
-                                scrollToImage(nextIndex);
-                            }, 3000);
+                            if (propertyData.images.length > 1) {
+                                autoScrollRef.current = setTimeout(() => {
+                                    const nextIndex = (activeImageIndex + 1) % propertyData.images.length;
+                                    scrollToImage(nextIndex);
+                                }, 3000);
+                            }
                         }}
                     >
                         {propertyData.images.map((image, index) => (
-                            <Image
-                                key={index}
-                                source={{ uri: image }}
-                                style={{
-                                    width: screenWidth,
-                                    height: 300,
-                                }}
-                                resizeMode="cover"
-                            />
+                            <View key={index} style={{ width: screenWidth, height: 300 }}>
+                                <Image
+                                    source={{ uri: image }}
+                                    style={{
+                                        width: '100%',
+                                        height: '100%',
+                                    }}
+                                    resizeMode="cover"
+                                    onError={(error) => {
+                                        console.log('❌ Image loading error:', error.nativeEvent.error);
+                                        // Fallback image set karein agar load nahi hoti
+                                    }}
+                                />
+                            </View>
                         ))}
                     </ScrollView>
 
-                    {/* Image Indicators */}
+                    {/* Image Indicators - only show if multiple images */}
+                    {propertyData.images.length > 1 && (
+                        <View style={{
+                            position: 'absolute',
+                            bottom: 20,
+                            left: 0,
+                            right: 0,
+                            flexDirection: 'row',
+                            justifyContent: 'center',
+                        }}>
+                            {propertyData.images.map((_, index) => (
+                                <TouchableOpacity
+                                    key={index}
+                                    style={{
+                                        width: 8,
+                                        height: 8,
+                                        borderRadius: 4,
+                                        backgroundColor: activeImageIndex === index ? '#fff' : 'rgba(255,255,255,0.5)',
+                                        marginHorizontal: 4,
+                                    }}
+                                    onPress={() => {
+                                        scrollToImage(index);
+                                        if (autoScrollRef.current) {
+                                            clearTimeout(autoScrollRef.current);
+                                        }
+                                        if (propertyData.images.length > 1) {
+                                            autoScrollRef.current = setTimeout(() => {
+                                                const nextIndex = (index + 1) % propertyData.images.length;
+                                                scrollToImage(nextIndex);
+                                            }, 3000);
+                                        }
+                                    }}
+                                />
+                            ))}
+                        </View>
+                    )}
+
+                    {/* Image Counter */}
                     <View style={{
                         position: 'absolute',
-                        bottom: 20,
-                        left: 0,
-                        right: 0,
-                        flexDirection: 'row',
-                        justifyContent: 'center',
+                        top: 10,
+                        left: 10,
+                        backgroundColor: 'rgba(0,0,0,0.7)',
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        borderRadius: 12,
                     }}>
-                        {propertyData.images.map((_, index) => (
-                            <TouchableOpacity
-                                key={index}
-                                style={{
-                                    width: 8,
-                                    height: 8,
-                                    borderRadius: 4,
-                                    backgroundColor: activeImageIndex === index ? '#fff' : 'rgba(255,255,255,0.5)',
-                                    marginHorizontal: 4,
-                                }}
-                                onPress={() => {
-                                    scrollToImage(index);
-                                    // Manual click par bhi auto scroll reset ho
-                                    if (autoScrollRef.current) {
-                                        clearTimeout(autoScrollRef.current);
-                                    }
-                                    autoScrollRef.current = setTimeout(() => {
-                                        const nextIndex = (index + 1) % propertyData.images.length;
-                                        scrollToImage(nextIndex);
-                                    }, 3000);
-                                }}
-                            />
-                        ))}
+                        <Text style={{
+                            fontSize: 12,
+                            fontFamily: 'Inter-Medium',
+                            color: '#fff',
+                        }}>
+                            {activeImageIndex + 1} / {propertyData.images.length}
+                        </Text>
                     </View>
 
                     {/* Favorite Button */}
@@ -257,65 +338,6 @@ const PropertyDetail = () => {
                     }}>
                         {propertyData.price}
                     </Text>
-
-                    {/* Property Features */}
-                    {/* <View style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-around',
-                        borderTopWidth: 1,
-                        borderTopColor: '#f0f0f0',
-                        borderBottomWidth: 1,
-                        borderBottomColor: '#f0f0f0',
-                        paddingVertical: 15,
-                    }}>
-                        <View style={{ alignItems: 'center' }}>
-                            <Ionicons name="bed-outline" size={24} color={colors.AppColor} />
-                            <Text style={{
-                                fontSize: 14,
-                                fontFamily: 'Inter-Medium',
-                                color: colors.TextColorBlack,
-                                marginTop: 4,
-                            }}>
-                                {propertyData.bedrooms} Beds
-                            </Text>
-                        </View>
-
-                        <View style={{ alignItems: 'center' }}>
-                            <Ionicons name="water-outline" size={24} color={colors.AppColor} />
-                            <Text style={{
-                                fontSize: 14,
-                                fontFamily: 'Inter-Medium',
-                                color: colors.TextColorBlack,
-                                marginTop: 4,
-                            }}>
-                                {propertyData.bathrooms} Baths
-                            </Text>
-                        </View>
-
-                        <View style={{ alignItems: 'center' }}>
-                            <Ionicons name="resize-outline" size={24} color={colors.AppColor} />
-                            <Text style={{
-                                fontSize: 14,
-                                fontFamily: 'Inter-Medium',
-                                color: colors.TextColorBlack,
-                                marginTop: 4,
-                            }}>
-                                {propertyData.area}
-                            </Text>
-                        </View>
-
-                        <View style={{ alignItems: 'center' }}>
-                            <Ionicons name="business-outline" size={24} color={colors.AppColor} />
-                            <Text style={{
-                                fontSize: 14,
-                                fontFamily: 'Inter-Medium',
-                                color: colors.TextColorBlack,
-                                marginTop: 4,
-                            }}>
-                                {propertyData.type}
-                            </Text>
-                        </View>
-                    </View> */}
                 </View>
 
                 {/* Description */}

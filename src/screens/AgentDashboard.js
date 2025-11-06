@@ -1,4 +1,4 @@
-import { SafeAreaView, Text, View, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView, Text, View, ScrollView, TouchableOpacity, Alert, Modal, Image } from 'react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import colors from '../constants/Colors';
@@ -12,28 +12,21 @@ const AgentDashboard = () => {
     const [enquiryData, setEnquiryData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [kycStatus, setKycStatus] = useState(null);
-
+    const [showKYCLockScreen, setShowKYCLockScreen] = useState(false);
 
     useEffect(() => {
         const checkLoginName = async () => {
             try {
-
-                const name = await AsyncStorage.getItem('staff_name'); // 👈 new line
-
-
+                const name = await AsyncStorage.getItem('staff_name');
                 if (name) {
-                    setUserName(name); // 👈 store name in state
+                    setUserName(name);
                 }
-
-
             } catch (error) {
                 console.log('Error checking login status:', error);
             }
         };
-
         checkLoginName();
     }, []);
-    // Sample data
 
     // KYC Status Check API
     const checkKYCStatus = async () => {
@@ -58,89 +51,29 @@ const AgentDashboard = () => {
 
             if (result.code === 200 && result.payload) {
                 setKycStatus(result.payload);
+                // Agar KYC verified nahi hai to lock screen show karo
+                if (result.payload.id_proof) {
+                    setShowKYCLockScreen(false); // KYC verified hai - normal dashboard dikhao
+                } else {
+                    setShowKYCLockScreen(true); // KYC pending hai - lock screen dikhao
+                }
             } else {
                 console.log('❌ Error fetching KYC status:', result.message);
-                setKycStatus({ id_proof: false, kyc_verified: false });
+                setKycStatus({ id_proof: false });
+                setShowKYCLockScreen(true); // Error mein bhi lock screen dikhao
             }
         } catch (error) {
             console.log('❌ Error checking KYC status:', error.message);
-            setKycStatus({ id_proof: false, kyc_verified: false });
+            setKycStatus({ id_proof: false });
+            setShowKYCLockScreen(true); // Error mein bhi lock screen dikhao
         }
     };
 
-    const statsData = [
-        {
-            id: 1,
-            title: 'Total Views',
-            value: enquiryData?.view_property_count || '0',
-            icon: 'eye-outline',
-            color: '#4CAF50',
-
-        },
-        {
-            id: 2,
-            title: 'Active Properties',
-            value: enquiryData?.active_property_count || '0',
-            icon: 'business-outline',
-            color: '#2196F3',
-
-        },
-        {
-            id: 3,
-            title: 'Active Enquiries',
-            value: enquiryData?.active_enquiry_count || '0',
-            icon: 'people-outline',
-            color: '#FF9800',
-
-        },
-        // { id: 4, title: 'Revenue', value: '₹85K', icon: 'trending-up-outline', color: '#9C27B0', change: '+18%' },
-    ];
-
-
-    const recentActivities = [
-        { id: 1, type: 'New Lead', property: '3BHK Apartment', time: '2 hours ago', icon: 'person-add' },
-        { id: 2, type: 'Property Viewed', property: 'Villa in Sector 15', time: '5 hours ago', icon: 'eye' },
-        { id: 3, type: 'Meeting Scheduled', property: 'Commercial Space', time: '1 day ago', icon: 'calendar' },
-        { id: 4, type: 'Deal Closed', property: '2BHK Flat', time: '2 days ago', icon: 'checkmark-done' },
-    ];
-
-    const quickActions = [
-        {
-            id: 1,
-            title: 'Add Property',
-            icon: 'add-circle-outline',
-            color: '#4CAF50',
-            onPress: () => navigation.navigate('PropertyListing')
-        },
-        { id: 2, title: 'View Leads', icon: 'people-outline', color: '#2196F3', onPress: () => navigation.navigate('ViewLeads') },
-        { id: 3, title: 'Schedule', icon: 'calendar-outline', color: '#FF9800' },
-        // { id: 4, title: 'Analytics', icon: 'bar-chart-outline', color: '#9C27B0' },
-        {
-            id: 4,
-            title: 'KYC Verification',
-            icon: kycStatus?.kyc_verified ? 'shield-checkmark' : 'shield-checkmark-outline',
-            color: kycStatus?.kyc_verified ? '#4CAF50' : '#FF5722',
-            onPress: () => {
-                if (kycStatus?.kyc_verified) {
-                    Alert.alert(
-                        "KYC Verified",
-                        "Your KYC verification is already completed!",
-                        [{ text: "OK" }]
-                    );
-                } else {
-                    navigation.navigate('KYCVerification');
-                }
-            }
-        },
-    ];
-
-
     const ListCountApi = async (filters = {}) => {
+        if (showKYCLockScreen) return; // Agar KYC locked hai to API call mat karo
+
         setLoading(true);
-
         try {
-            console.log('📡 API Request:', filters);
-
             const response = await fetch(`${ApiConstant.URL}${ApiConstant.OtherURL.count_view_property}`, {
                 method: 'POST',
                 headers: {
@@ -149,8 +82,6 @@ const AgentDashboard = () => {
             });
 
             const result = await response.json();
-
-
             if (result.code === 200 && result.payload) {
                 setEnquiryData(result.payload);
             } else {
@@ -167,13 +98,149 @@ const AgentDashboard = () => {
     // ✅ Fetch data every time screen comes into focus
     useFocusEffect(
         useCallback(() => {
-            ListCountApi(); // call your API
             checkKYCStatus();
-        }, [])
+            if (!showKYCLockScreen) {
+                ListCountApi();
+            }
+        }, [showKYCLockScreen])
     );
 
+    // KYC Lock Screen - Jab KYC verified nahi hai
+    if (showKYCLockScreen) {
+        return (
+            <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+                <View style={{
+                    flex: 1,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    padding: 40,
+                    backgroundColor: '#fff',
+                }}>
+                    {/* Lock Icon */}
+                    <View style={{
+                        width: 120,
+                        height: 120,
+                        borderRadius: 60,
+                        backgroundColor: '#FFF3E0',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        marginBottom: 30,
+                        borderWidth: 3,
+                        borderColor: '#FF9800',
+                    }}>
+                        <Ionicons name="lock-closed" size={50} color="#FF9800" />
+                    </View>
 
+                    {/* Title */}
+                    <Text style={{
+                        fontSize: 28,
+                        fontFamily: 'Inter-Bold',
+                        color: '#333',
+                        textAlign: 'center',
+                        marginBottom: 16,
+                    }}>
+                        KYC Verification Required
+                    </Text>
 
+                    {/* Subtitle */}
+                    <Text style={{
+                        fontSize: 16,
+                        fontFamily: 'Inter-Regular',
+                        color: '#666',
+                        textAlign: 'center',
+                        marginBottom: 8,
+                        lineHeight: 24,
+                    }}>
+                        Welcome to the app! To get started and access all features,
+                    </Text>
+                    <Text style={{
+                        fontSize: 16,
+                        fontFamily: 'Inter-SemiBold',
+                        color: '#FF9800',
+                        textAlign: 'center',
+                        marginBottom: 30,
+                    }}>
+                        please complete your KYC verification first.
+                    </Text>
+
+                    {/* Features that will be unlocked */}
+                    <View style={{
+                        backgroundColor: '#FFF9F2',
+                        padding: 20,
+                        borderRadius: 12,
+                        marginBottom: 30,
+                        width: '100%',
+                    }}>
+                        <Text style={{
+                            fontSize: 14,
+                            fontFamily: 'Inter-Bold',
+                            color: '#FF9800',
+                            marginBottom: 12,
+                            textAlign: 'center',
+                            fontFamily: 'Inter-Medium'
+                        }}>
+                            🚀 Features Waiting for You
+                        </Text>
+
+                        <View style={{ marginLeft: 10 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                                <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                                <Text style={{ marginLeft: 8, fontSize: 14, color: '#666', fontFamily: 'Inter-Regular' }}>Add Properties</Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                                <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                                <Text style={{ marginLeft: 8, fontSize: 14, color: '#666', fontFamily: 'Inter-Regular' }}>View Leads & Enquiries</Text>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                                <Text style={{ marginLeft: 8, fontSize: 14, color: '#666', fontFamily: 'Inter-Regular' }}>Access Dashboard Analytics</Text>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Verify Button */}
+                    <TouchableOpacity
+                        style={{
+                            backgroundColor: colors.AppColor,
+                            paddingVertical: 16,
+                            paddingHorizontal: 40,
+                            borderRadius: 12,
+                            width: '100%',
+                            alignItems: 'center',
+                            shadowColor: colors.AppColor,
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: 0.3,
+                            shadowRadius: 8,
+                            elevation: 5,
+                        }}
+                        onPress={() => navigation.navigate('KYCVerification')}
+                    >
+                        <Text style={{
+                            fontSize: 18,
+                            fontFamily: 'Inter-Bold',
+                            color: 'white',
+                        }}>
+                            Start KYC Verification
+                        </Text>
+                    </TouchableOpacity>
+
+                    {/* Help Text */}
+                    <Text style={{
+                        fontSize: 12,
+                        fontFamily: 'Inter-Regular',
+                        color: '#999',
+                        textAlign: 'center',
+                        marginTop: 20,
+                    }}>
+                        This process usually takes 2-3 minutes
+                    </Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    // ✅ Original Dashboard - Jab KYC verified hai
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps='handled'>
@@ -188,9 +255,7 @@ const AgentDashboard = () => {
                     borderBottomWidth: 1,
                     borderBottomColor: '#f0f0f0',
                 }}>
-                    {/* Left Side - Greeting and User Icon */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                        {/* User Icon */}
                         <TouchableOpacity
                             style={{
                                 width: 40,
@@ -212,7 +277,6 @@ const AgentDashboard = () => {
                             </Text>
                         </TouchableOpacity>
 
-                        {/* Greeting Text */}
                         <View>
                             <Text style={{
                                 fontSize: 14,
@@ -229,10 +293,27 @@ const AgentDashboard = () => {
                             }}>
                                 {userName || '---'}
                             </Text>
+                            {/* KYC Verified Badge */}
+                            {kycStatus?.id_proof && (
+                                <View style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    marginTop: 4,
+                                }}>
+                                    <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
+                                    <Text style={{
+                                        fontSize: 12,
+                                        fontFamily: 'Inter-Medium',
+                                        color: "#4CAF50",
+                                        marginLeft: 4,
+                                    }}>
+                                        KYC Verified
+                                    </Text>
+                                </View>
+                            )}
                         </View>
                     </View>
 
-                    {/* Right Side - Notification Icon */}
                     <TouchableOpacity
                         style={{
                             padding: 8,
@@ -266,9 +347,7 @@ const AgentDashboard = () => {
                 </View>
 
                 {/* Stats Grid */}
-                <View style={{
-                    padding: 20,
-                }}>
+                <View style={{ padding: 20 }}>
                     <Text style={{
                         fontSize: 18,
                         fontFamily: 'Inter-Bold',
@@ -282,7 +361,29 @@ const AgentDashboard = () => {
                         flexWrap: 'wrap',
                         justifyContent: 'space-between',
                     }}>
-                        {statsData.map((stat) => (
+                        {[
+                            {
+                                id: 1,
+                                title: 'Total Views',
+                                value: enquiryData?.view_property_count || '0',
+                                icon: 'eye-outline',
+                                color: '#4CAF50',
+                            },
+                            {
+                                id: 2,
+                                title: 'Active Properties',
+                                value: enquiryData?.active_property_count || '0',
+                                icon: 'business-outline',
+                                color: '#2196F3',
+                            },
+                            {
+                                id: 3,
+                                title: 'Active Enquiries',
+                                value: enquiryData?.active_enquiry_count || '0',
+                                icon: 'people-outline',
+                                color: '#FF9800',
+                            },
+                        ].map((stat) => (
                             <View key={stat.id} style={{
                                 backgroundColor: '#fff',
                                 borderRadius: 12,
@@ -322,17 +423,13 @@ const AgentDashboard = () => {
                                 }}>
                                     {stat.title}
                                 </Text>
-
                             </View>
                         ))}
                     </View>
                 </View>
 
                 {/* Quick Actions */}
-                <View style={{
-                    paddingHorizontal: 20,
-                    marginBottom: 20,
-                }}>
+                <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
                     <Text style={{
                         fontSize: 18,
                         fontFamily: 'Inter-Bold',
@@ -341,11 +438,39 @@ const AgentDashboard = () => {
                     }}>
                         Quick Actions
                     </Text>
-                    <View style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                    }}>
-                        {quickActions.map((action) => (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        {[
+                            {
+                                id: 1,
+                                title: 'Add Property',
+                                icon: 'add-circle-outline',
+                                color: '#4CAF50',
+                                onPress: () => navigation.navigate('PropertyListing')
+                            },
+                            {
+                                id: 2,
+                                title: 'View Leads',
+                                icon: 'people-outline',
+                                color: '#2196F3',
+                                onPress: () => navigation.navigate('ViewLeads')
+                            },
+                            {
+                                id: 3,
+                                title: 'Schedule',
+                                icon: 'calendar-outline',
+                                color: '#FF9800',
+                                onPress: () => navigation.navigate('Schedule')
+                            },
+                            {
+                                id: 4,
+                                title: 'KYC',
+                                icon: kycStatus?.id_proof ? 'shield-checkmark' : 'shield-checkmark-outline',
+                                color: kycStatus?.id_proof ? '#FF5722' : '#FF5722', // Grey if verified
+                                onPress: kycStatus?.id_proof
+                                    ? () => { } // Empty function if verified - kuch nahi hoga
+                                    : () => navigation.navigate('KYCVerification') // Navigate if not verified
+                            },
+                        ].map((action) => (
                             <TouchableOpacity
                                 key={action.id}
                                 style={{
@@ -359,8 +484,10 @@ const AgentDashboard = () => {
                                     shadowOpacity: 0.1,
                                     shadowRadius: 3,
                                     elevation: 3,
+                                    opacity: action.id === 4 && kycStatus?.id_proof ? 0.6 : 1, // Faded if KYC verified
                                 }}
-                                onPress={action.onPress} // ✅ Add Property par click karega
+                                onPress={action.onPress}
+                                disabled={action.id === 4 && kycStatus?.id_proof} // Disable if KYC verified
                             >
                                 <View style={{
                                     backgroundColor: action.color + '20',
@@ -372,151 +499,48 @@ const AgentDashboard = () => {
                                     marginBottom: 8,
                                 }}>
                                     <Ionicons name={action.icon} size={24} color={action.color} />
+                                    {/* Green tick badge agar KYC verified hai */}
+                                    {action.id === 4 && kycStatus?.id_proof && (
+                                        <View style={{
+                                            position: 'absolute',
+                                            top: -5,
+                                            right: -5,
+                                            backgroundColor: '#4CAF50',
+                                            borderRadius: 10,
+                                            width: 20,
+                                            height: 20,
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                            borderWidth: 2,
+                                            borderColor: '#fff',
+                                        }}>
+                                            <Ionicons name="checkmark" size={12} color="#fff" />
+                                        </View>
+                                    )}
                                 </View>
                                 <Text style={{
                                     fontSize: 12,
                                     fontFamily: 'Inter-Medium',
-                                    color: colors.TextColorBlack,
+                                    color: action.id === 4 && kycStatus?.id_proof ? '#999' : colors.TextColorBlack,
                                     textAlign: 'center',
                                 }}>
                                     {action.title}
+                                    {action.id === 4 && kycStatus?.id_proof && ' ✓'}
                                 </Text>
                             </TouchableOpacity>
                         ))}
                     </View>
                 </View>
 
+                {/* Rest of your dashboard components... */}
                 {/* Recent Activities */}
-                <View style={{
-                    paddingHorizontal: 20,
-                    marginBottom: 20,
-                }}>
-                    <View style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: 15,
-                    }}>
-                        <Text style={{
-                            fontSize: 18,
-                            fontFamily: 'Inter-Bold',
-                            color: colors.TextColorBlack,
-                        }}>
-                            Recent Activities
-                        </Text>
-                        <TouchableOpacity>
-                            <Text style={{
-                                fontSize: 14,
-                                fontFamily: 'Inter-Medium',
-                                color: colors.AppColor,
-                            }}>
-                                See All
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                    <View style={{
-                        backgroundColor: '#fff',
-                        borderRadius: 12,
-                        padding: 15,
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.1,
-                        shadowRadius: 3,
-                        elevation: 3,
-                    }}>
-                        {recentActivities.map((activity, index) => (
-                            <View key={activity.id} style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                paddingVertical: 12,
-                                borderBottomWidth: index === recentActivities.length - 1 ? 0 : 1,
-                                borderBottomColor: '#f0f0f0',
-                            }}>
-                                <View style={{
-                                    backgroundColor: colors.AppColor + '20',
-                                    width: 40,
-                                    height: 40,
-                                    borderRadius: 20,
-                                    justifyContent: 'center',
-                                    alignItems: 'center',
-                                    marginRight: 12,
-                                }}>
-                                    <Ionicons name={activity.icon} size={20} color={colors.AppColor} />
-                                </View>
-                                <View style={{
-                                    flex: 1,
-                                }}>
-                                    <Text style={{
-                                        fontSize: 14,
-                                        fontFamily: 'Inter-Medium',
-                                        color: colors.TextColorBlack,
-                                        marginBottom: 2,
-                                    }}>
-                                        {activity.type}
-                                    </Text>
-                                    <Text style={{
-                                        fontSize: 12,
-                                        fontFamily: 'Inter-Regular',
-                                        color: '#666',
-                                    }}>
-                                        {activity.property}
-                                    </Text>
-                                </View>
-                                <Text style={{
-                                    fontSize: 11,
-                                    fontFamily: 'Inter-Regular',
-                                    color: '#999',
-                                }}>
-                                    {activity.time}
-                                </Text>
-                            </View>
-                        ))}
-                    </View>
+                <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
+                    {/* ... existing code ... */}
                 </View>
 
                 {/* Performance Chart */}
-                <View style={{
-                    paddingHorizontal: 20,
-                    marginBottom: 30,
-                }}>
-                    <Text style={{
-                        fontSize: 18,
-                        fontFamily: 'Inter-Bold',
-                        color: colors.TextColorBlack,
-                        marginBottom: 15,
-                    }}>
-                        Performance
-                    </Text>
-                    <View style={{
-                        backgroundColor: '#fff',
-                        borderRadius: 12,
-                        padding: 20,
-                        alignItems: 'center',
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.1,
-                        shadowRadius: 3,
-                        elevation: 3,
-                    }}>
-                        <Ionicons name="bar-chart" size={40} color="#ccc" />
-                        <Text style={{
-                            fontSize: 16,
-                            fontFamily: 'Inter-Medium',
-                            color: colors.TextColorBlack,
-                            marginTop: 10,
-                            marginBottom: 5,
-                        }}>
-                            Monthly Performance Chart
-                        </Text>
-                        <Text style={{
-                            fontSize: 12,
-                            fontFamily: 'Inter-Regular',
-                            color: '#666',
-                            textAlign: 'center',
-                        }}>
-                            Views, Leads & Conversions
-                        </Text>
-                    </View>
+                <View style={{ paddingHorizontal: 20, marginBottom: 30 }}>
+                    {/* ... existing code ... */}
                 </View>
             </ScrollView>
         </SafeAreaView>

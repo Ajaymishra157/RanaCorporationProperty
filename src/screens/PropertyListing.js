@@ -8,7 +8,8 @@ import {
     FlatList,
     Modal,
     ToastAndroid,
-    TextInput
+    TextInput,
+    RefreshControl
 } from 'react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -26,6 +27,7 @@ const PropertyListing = () => {
     const [deletePropertyModal, setDeletePropertyModal] = useState(false);
     const [selectedProperty, setSelectedProperty] = useState('');
     const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
 
     // Filter options state
     const [filterOptions, setFilterOptions] = useState({
@@ -76,6 +78,7 @@ const PropertyListing = () => {
 
     const ListPropertyApi = async (filters = {}) => {
         setLoading(true);
+        setRefreshing(true);
         try {
             const requestBody = {};
 
@@ -118,7 +121,15 @@ const PropertyListing = () => {
             console.log('❌ Error fetching data:', error.message);
         } finally {
             setLoading(false);
+            setRefreshing(false);
+
         }
+    };
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await ListPropertyApi(); // Re-fetch data
+        setRefreshing(false); // Stop refreshing once data is fetched
     };
 
     useFocusEffect(
@@ -457,7 +468,11 @@ const PropertyListing = () => {
             {/* Property Image */}
             <View style={{ position: 'relative' }}>
                 <Image
-                    source={{ uri: item.images && item.images.length > 0 ? item.images[0] : 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400' }}
+                    source={{
+                        uri: item.images && item.images.length > 0
+                            ? item.images[0].img_file  // 👈 yahan .img_file use karo
+                            : 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400'
+                    }}
                     style={{
                         width: '100%',
                         height: 180,
@@ -653,7 +668,15 @@ const PropertyListing = () => {
                     </Text>
                 </View>
             )}
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={[colors.AppColor]}
+                        tintColor={colors.AppColor}
+                    />
+                }>
                 {/* Header */}
                 <Header
                     title="My Properties"
@@ -875,17 +898,33 @@ const PropertyListing = () => {
                 )}
 
                 {/* Properties List */}
-                <View style={{ padding: 10 }}>
+                <View style={{ padding: 10, flex: 1, }}>
                     <FlatList
                         data={listProperty}
                         renderItem={renderPropertyCard}
                         keyExtractor={item => item.p_id.toString()}
                         showsVerticalScrollIndicator={false}
                         scrollEnabled={false}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={onRefresh}
+                                colors={['#2196F3']} // optional spinner color
+                            />
+                        }
+                        ListEmptyComponent={
+                            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 50 }}>
+                                <Image
+                                    source={require('../assets/images/Property.png')} // 👈 apna image path
+                                    style={{ width: 100, height: 100, marginBottom: 15, resizeMode: 'contain' }}
+                                />
+                                <Text style={{ fontSize: 16, color: colors.red }}>No Property Yet</Text>
+                            </View>
+                        }
                     />
                 </View>
 
-                <View style={{ height: 20 }} />
+
 
                 {/* Delete Confirmation Modal */}
                 <Modal

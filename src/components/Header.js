@@ -25,7 +25,7 @@ const Header = ({
             <View style={{
                 flex: 1,
                 flexDirection: 'row',
-                alignItems: 'center',
+                alignItems: 'flex-start',
             }}>
                 {showBackButton && (
                     <TouchableOpacity

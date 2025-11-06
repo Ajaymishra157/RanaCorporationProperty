@@ -5,6 +5,7 @@ import {
     ActivityIndicator,
     TouchableOpacity,
     FlatList,
+    Linking,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -118,6 +119,7 @@ const ViewLeads = () => {
                 <View
                     style={{
                         backgroundColor: lead.status === 'Active' ? '#e8f5e8' : '#ffe6e6',
+                        justifyContent: 'center', alignItems: 'center',
                         paddingHorizontal: 6,
                         paddingVertical: 2,
                         borderRadius: 8,
@@ -183,11 +185,18 @@ const ViewLeads = () => {
                         flexDirection: 'row',
                         alignItems: 'center',
                     }}
-                    onPress={() => console.log('Calling:', lead.mobile)}
+                    onPress={() => {
+                        if (lead.mobile) {
+                            Linking.openURL(`tel:${lead.mobile}`);
+                        } else {
+                            ToastAndroid.show('Mobile number not available', ToastAndroid.SHORT);
+                        }
+                    }}
                 >
                     <Ionicons name="call" size={10} color={colors.TextColorWhite} />
-                    <Text style={{ fontSize: 10, color: colors.TextColorWhite, marginLeft: 4 }}>Call</Text>
+                    <Text style={{ fontSize: 10, color: colors.TextColorWhite, marginLeft: 4, fontFamily: 'Inter-Regular' }}>Call</Text>
                 </TouchableOpacity>
+
             </View>
         </TouchableOpacity>
     );

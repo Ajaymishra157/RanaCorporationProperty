@@ -30,6 +30,14 @@ const ApiConstant = {
         count_view_property: 'count_view_property.php',
 
 
+        list_state: 'list_state.php',
+        list_cities: 'list_cities.php',
+
+
+
+
+
+
 
 
 
