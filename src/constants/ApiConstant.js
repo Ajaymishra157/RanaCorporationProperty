@@ -14,20 +14,36 @@ const ApiConstant = {
 
 
 
-
         list_property: 'property/list_property.php',
         add_property: 'property/add_property.php',
         delete_property: 'property/delete_property.php',
         update_property: 'property/update_property.php',
         update_property_image: 'property/update_property_image.php',
+        delete_property_image: 'property/delete_property_image.php',
+        add_view_property: 'property/add_view_property.php',
+
+
 
         list_category: 'category/list_category.php',
 
+
+        add_enquiry: 'enquiry/add_enquiry.php',
         list_enquiry: 'enquiry/list_enquiry.php',
+        change_enquiry_status: 'enquiry/change_enquiry_status.php',
+
 
         list_review: 'rating_review/list_review.php',
 
         count_view_property: 'count_view_property.php',
+
+        list_wishlist: 'wishlist/list_wishlist.php',
+        add_wishlist: 'wishlist/add_wishlist.php',
+        check_wishlist: 'wishlist/check_wishlist.php',
+        delete_wishlist: 'wishlist/delete_wishlist.php',
+
+
+
+
 
 
         list_state: 'list_state.php',

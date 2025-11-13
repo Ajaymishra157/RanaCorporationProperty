@@ -12,14 +12,14 @@
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"
-      android:icon="@mipmap/ic_launcher"
-      android:roundIcon="@mipmap/ic_launcher_round"
+    android:icon="@drawable/play_store_512"
+    android:roundIcon="@drawable/play_store_512"
       android:allowBackup="false"
       android:theme="@style/AppTheme">
 
       <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyA_ksjOCGFxVCnhjJ1Zj4BBhJIaD4nlpfM" />
+        android:name="com.google.android.geo.API_KEY"
+        android:value="AIzaSyBvoWcgSBGvofFvJi2tPnOyr7mj7Plc1pk"/>
             
       <activity
         android:name=".MainActivity"

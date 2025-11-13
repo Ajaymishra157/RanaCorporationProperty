@@ -9,7 +9,8 @@ import {
     ToastAndroid,
     PermissionsAndroid,
     Platform,
-    Alert
+    Alert,
+    Linking
 } from 'react-native'
 import React, { useState } from 'react'
 import { useNavigation } from '@react-navigation/native'
@@ -63,6 +64,43 @@ const KYCVerification = () => {
             setState: setPanCard
         }
     ]
+
+    // ✅ Gallery Permission Check - AgentAddProperty jaisa
+    const checkGalleryPermission = async () => {
+        if (Platform.OS === 'android') {
+            try {
+                // Android 13+ (API 33+) ke liye
+                if (Platform.Version >= 33) {
+                    const granted = await PermissionsAndroid.request(
+                        PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
+                        {
+                            title: 'Storage Permission Required',
+                            message: 'This app needs access to your gallery to select photos',
+                            buttonPositive: 'OK',
+                            buttonNegative: 'Cancel',
+                        }
+                    );
+                    return granted === PermissionsAndroid.RESULTS.GRANTED;
+                } else {
+                    // Android 12 aur niche ke liye
+                    const granted = await PermissionsAndroid.request(
+                        PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+                        {
+                            title: 'Storage Permission Required',
+                            message: 'This app needs access to your gallery to select photos',
+                            buttonPositive: 'OK',
+                            buttonNegative: 'Cancel',
+                        }
+                    );
+                    return granted === PermissionsAndroid.RESULTS.GRANTED;
+                }
+            } catch (error) {
+                console.log('Permission error:', error);
+                return false;
+            }
+        }
+        return true; // iOS mein always true
+    };
 
     // ✅ Open Image Selection Modal
     const openImageSelectModal = (docType) => {
@@ -122,8 +160,27 @@ const KYCVerification = () => {
     };
 
     // ✅ Open Gallery
+    // ✅ Open Gallery - IMPROVED VERSION
     const openGallery = async () => {
         try {
+            // ✅ Permission check karo
+            const hasPermission = await checkGalleryPermission();
+
+            if (!hasPermission) {
+                Alert.alert(
+                    'Permission Denied',
+                    'Storage permission is required to access gallery. Please enable it in app settings.',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                            text: 'Open Settings',
+                            onPress: () => Linking.openSettings()
+                        }
+                    ]
+                );
+                return;
+            }
+
             const image = await ImagePicker.openPicker({
                 mediaType: 'photo',
                 cropping: true,
@@ -132,12 +189,18 @@ const KYCVerification = () => {
                 compressImageMaxWidth: 500,
                 compressImageMaxHeight: 500,
                 compressImageQuality: 0.7,
-                includeBase64: true,
-            })
-            await handleImagePick(image)
+                includeBase64: true, // ✅ Base64 include karo
+                forceJpg: true, // ✅ JPG format force karo
+            });
+
+            await handleImagePick(image);
+
         } catch (error) {
-            if (error.code !== 'E_PICKER_CANCELLED') {
-                ToastAndroid.show('Failed to select image', ToastAndroid.SHORT)
+            console.log('Gallery Error:', error);
+            if (error.code === 'E_PERMISSION_MISSING') {
+                Alert.alert('Permission Required', 'Please grant storage permission to access gallery');
+            } else if (error.code !== 'E_PICKER_CANCELLED') {
+                Alert.alert('Error', 'Cannot open gallery. Please check app permissions.');
             }
         }
     }

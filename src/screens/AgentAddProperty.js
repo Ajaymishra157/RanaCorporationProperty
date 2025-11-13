@@ -13,8 +13,11 @@ import {
     PermissionsAndroid,
     Platform,
     Linking,
+    ActivityIndicator,
+    Modal,
+    Keyboard,
 } from 'react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import colors from '../constants/Colors';
@@ -22,6 +25,10 @@ import CustomButton from '../components/CustomButton';
 import ImagePicker from 'react-native-image-crop-picker';
 import Header from '../components/Header';
 import ApiConstant from '../constants/ApiConstant';
+import ConfirmationModal from '../components/ConfirmationModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Bottomtab from '../components/Bottomtab';
+import { Dropdown } from 'react-native-element-dropdown';
 
 const AgentAddProperty = () => {
     const navigation = useNavigation();
@@ -46,7 +53,11 @@ const AgentAddProperty = () => {
     const [selectedState, setSelectedState] = useState(null);
     const [selectedCity, setSelectedCity] = useState(null);
     const [stateDropdownVisible, setStateDropdownVisible] = useState(false);
+    const [stateSearch, setStateSearch] = useState('');
+
     const [cityDropdownVisible, setCityDropdownVisible] = useState(false);
+    const [citySearch, setCitySearch] = useState('');
+
     const [loadingCities, setLoadingCities] = useState(false);
 
     const [amenities, setAmenities] = useState([]);
@@ -59,6 +70,10 @@ const AgentAddProperty = () => {
     const [propertyStatus, setPropertyStatus] = useState('Available');
     const [budgetDropdownVisible, setBudgetDropdownVisible] = useState(false);
 
+    const [confirmationModalVisible, setConfirmationModalVisible] = useState(false);
+    const [photoToDelete, setPhotoToDelete] = useState(null);
+
+
     // ✅ Media states with base64 support
     const [photos, setPhotos] = useState([]);
     // const [videos, setVideos] = useState([]);
@@ -66,6 +81,10 @@ const AgentAddProperty = () => {
     const [uploading, setUploading] = useState(false);
 
     const [errors, setErrors] = useState({});
+
+    // // ✅ NEW: Agent details states
+    // const [agentName, setAgentName] = useState('');
+    // const [agentMobile, setAgentMobile] = useState('');
 
     // Available amenities
     const availableAmenities = [
@@ -98,6 +117,10 @@ const AgentAddProperty = () => {
             setBedrooms(property.bedrooms || '');
             setBathrooms(property.bathrooms || '');
 
+            // ✅ NEW: Agent details prefilling
+            // setAgentName(property.agent_name || '');
+            // setAgentMobile(property.agent_mobile || '');
+
             // ✅ Property Type & Category
             setPropertyType(property.type || 'Residential');
 
@@ -117,7 +140,7 @@ const AgentAddProperty = () => {
             setPropertyStatus(property.p_status || 'Available');
 
             // ✅ Video Link - videos array se first video
-            setVideoLink(property.video && property.video.length > 0 ? property.video[0] : '');
+            setVideoLink(property.video && property.video.length > 0 ? property.video : '');
 
             // ✅ AMENITIES PREFILL - IMPORTANT
             if (property.amenities) {
@@ -166,19 +189,31 @@ const AgentAddProperty = () => {
     }, [property, cities, selectedState]);
 
     // ✅ IMAGES PREFILL
+    // ✅ IMAGES PREFILL - CORRECTED VERSION
     useEffect(() => {
         if (property && property.images && property.images.length > 0) {
-            const preloadedPhotos = property.images.map((img, index) => ({
-                id: `existing_${index}_${Date.now()}`,
-                uri: img,
-                base64: '', // Existing images ke liye base64 empty
-                mime: 'image/jpeg',
-                width: 400,
-                height: 300,
-                isExisting: true // Flag for existing images
-            }));
+            console.log('📸 Raw images data:', property.images);
+
+            const preloadedPhotos = property.images.map((imgObj, index) => {
+                // ✅ Correctly extract image URL from the object
+                const imageUrl = imgObj.img_file || imgObj.url || imgObj.uri || imgObj;
+                console.log(`📸 Image ${index}:`, imageUrl);
+
+                return {
+                    id: `existing_${imgObj.img_id || index}_${Date.now()}`,
+                    uri: imageUrl,
+                    base64: '', // Existing images ke liye base64 empty
+                    mime: 'image/jpeg',
+                    width: 400,
+                    height: 300,
+                    isExisting: true, // Flag for existing images
+                    img_id: imgObj.img_id // Store image ID for reference
+                };
+            });
+
             setPhotos(preloadedPhotos);
-            console.log('Images prefilled:', preloadedPhotos.length);
+            console.log('✅ Images prefilled:', preloadedPhotos.length);
+            console.log('✅ Prefilled photos details:', preloadedPhotos);
         }
     }, [property]);
 
@@ -287,27 +322,7 @@ const AgentAddProperty = () => {
         return true; // iOS mein always true
     };
 
-    // ✅ Convert image to base64 format
-    // const convertImageToBase64 = async (imageUri) => {
-    //     try {
-    //         const response = await fetch(imageUri);
-    //         const blob = await response.blob();
 
-    //         return new Promise((resolve, reject) => {
-    //             const reader = new FileReader();
-    //             reader.onloadend = () => {
-    //                 // Remove data:image/jpeg;base64, prefix if present
-    //                 const base64 = reader.result.split(',')[1];
-    //                 resolve(base64);
-    //             };
-    //             reader.onerror = reject;
-    //             reader.readAsDataURL(blob);
-    //         });
-    //     } catch (error) {
-    //         console.log('Error converting image to base64:', error);
-    //         throw error;
-    //     }
-    // };
     // ✅ Convert image to base64 format - IMPROVED VERSION
     const convertImageToBase64 = async (imageUri) => {
         try {
@@ -589,17 +604,83 @@ const AgentAddProperty = () => {
 
 
 
-    // ✅ Remove media item
+    // ✅ Remove media item with confirmation
     const removeMedia = (id, type) => {
-        if (type === 'photo') {
-            const updatedPhotos = photos.filter(photo => photo.id !== id);
-            setPhotos(updatedPhotos);
-            ToastAndroid.show('Photo removed', ToastAndroid.SHORT);
+        const mediaToRemove = type === 'photo'
+            ? photos.find(photo => photo.id === id)
+            : null;
+
+        // ✅ EDIT MODE: Agar existing image hai toh confirmation show karo
+        if (property && mediaToRemove?.isExisting) {
+            setPhotoToDelete({ id, type });
+            setConfirmationModalVisible(true);
         } else {
-            const updatedVideos = videos.filter(video => video.id !== id);
-            setVideos(updatedVideos);
-            ToastAndroid.show('Video removed', ToastAndroid.SHORT);
+            // ✅ ADD MODE ya non-existing image: Direct remove karo
+            performMediaDeletion(id, type);
         }
+    };
+    const [deletingImageId, setDeletingImageId] = useState(null);
+
+    // ✅ Remove media item with API call and loading state
+    const performMediaDeletion = async (id, type) => {
+        if (type === 'photo') {
+            const photoToRemove = photos.find(photo => photo.id === id);
+
+            // ✅ Agar existing image hai (edit mode mein) aur img_id hai
+            if (photoToRemove?.isExisting && photoToRemove?.img_id) {
+                setDeletingImageId(id); // Loading state set karo
+
+                try {
+                    console.log('🗑️ Deleting existing image with ID:', photoToRemove.img_id);
+
+                    const deleteResponse = await fetch(`${ApiConstant.URL}${ApiConstant.OtherURL.delete_property_image}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            pimage_id: photoToRemove.img_id
+                        }),
+                    });
+
+                    const deleteResult = await deleteResponse.json();
+                    console.log('🗑️ Delete API Response:', deleteResult);
+
+                    if (deleteResult.code === 200) {
+                        const updatedPhotos = photos.filter(photo => photo.id !== id);
+                        setPhotos(updatedPhotos);
+                        ToastAndroid.show('Image deleted successfully', ToastAndroid.SHORT);
+                    } else {
+                        ToastAndroid.show(deleteResult.message || 'Failed to delete image', ToastAndroid.SHORT);
+                    }
+
+                } catch (error) {
+                    console.log('❌ Error deleting image:', error);
+                    ToastAndroid.show('Network error while deleting image', ToastAndroid.SHORT);
+                } finally {
+                    setDeletingImageId(null); // Loading state clear karo
+                }
+            } else {
+                // ✅ Agar new image hai ya add mode mein hai
+                const updatedPhotos = photos.filter(photo => photo.id !== id);
+                setPhotos(updatedPhotos);
+                ToastAndroid.show('Photo removed', ToastAndroid.SHORT);
+            }
+        }
+    };
+    // ✅ Confirmation ke baad actual delete karega
+    const handleConfirmDelete = () => {
+        if (photoToDelete) {
+            performMediaDeletion(photoToDelete.id, photoToDelete.type);
+            setConfirmationModalVisible(false);
+            setPhotoToDelete(null);
+        }
+    };
+
+    // ✅ Modal close karega
+    const handleCloseModal = () => {
+        setConfirmationModalVisible(false);
+        setPhotoToDelete(null);
     };
 
     // ✅ Reset Form Function
@@ -625,11 +706,12 @@ const AgentAddProperty = () => {
         console.log('Form reset successfully');
     };
 
-    // ✅ Validate Form
+
+    // ✅ Validate Form - IMPROVED
     const validateForm = () => {
         let tempErrors = {};
 
-        if (!selectedCategory) tempErrors.category = 'Please select category';
+        // if (!selectedCategory) tempErrors.category = 'Please select category';
         if (!title.trim()) tempErrors.title = 'Please enter property title';
         if (!price.trim()) tempErrors.price = 'Please enter property price';
         if (!location.trim()) tempErrors.location = 'Please enter property location';
@@ -637,9 +719,37 @@ const AgentAddProperty = () => {
         if (!selectedCity) tempErrors.city = 'Please select city';
         if (photos.length === 0) tempErrors.photos = 'Please add at least one photo';
 
+        // ✅ OPTIONAL: Agent validation agar required hai
+        // if (!agentName.trim()) tempErrors.agentName = 'Please enter agent name';
+        // if (!agentMobile.trim()) tempErrors.agentMobile = 'Please enter agent mobile';
+        // if (agentMobile && agentMobile.length !== 10) tempErrors.agentMobile = 'Please enter valid 10-digit mobile number';
+
         setErrors(tempErrors);
         return Object.keys(tempErrors).length === 0;
     };
+
+    const closeAllDropdowns = () => {
+        setDropdownVisible(false);
+        setBudgetDropdownVisible(false);
+        setStateDropdownVisible(false);
+        setCityDropdownVisible(false);
+    };
+
+    const scrollViewRef = useRef(null);
+
+    // ✅ ScrollView के touch event handle करें
+    const handleScrollViewTouch = () => {
+        closeAllDropdowns();
+        // Keyboard.dismiss(); // कीबोर्ड भी बंद करें
+    };
+
+
+    // ✅ Jab bhi photos add/remove ho, error clear ho jaye
+    useEffect(() => {
+        if (photos.length > 0 && errors.photos) {
+            setErrors(prev => ({ ...prev, photos: '' }));
+        }
+    }, [photos.length]);
 
 
     // ✅ Main Submit Function with Base64 Array
@@ -744,13 +854,14 @@ const AgentAddProperty = () => {
     //     }
     // };
 
-    // ✅ Main Submit Function with Base64 Array - FIXED FOR EDIT MODE
+    // ✅ Main Submit Function with Base64 Array - UPDATED FOR CORRECT IMAGE HANDLING
     const handleSubmit = async () => {
         if (!validateForm()) return;
 
         setUploading(true);
 
         try {
+            const userId = await AsyncStorage.getItem('id');
             // ✅ Separate existing and new images
             const existingImages = photos.filter(photo => photo.isExisting);
             const newImages = photos.filter(photo => !photo.isExisting);
@@ -770,16 +881,15 @@ const AgentAddProperty = () => {
                 })
             );
 
-            // ✅ Filter out failed conversions
             const validNewImages = newImagesBase64.filter(img => img !== null);
 
             console.log('📸 Valid New Images:', validNewImages.length);
 
-            // ✅ Prepare JSON data - EDIT MODE MEIN DIFFERENT DATA BHEJNA HAI
+            // ✅ Prepare JSON data
             const propertyData = {
-                // ✅ Edit mode mein p_id add karein
                 ...(property && { p_id: property.p_id }),
                 category_id: selectedCategory.category_id || selectedCategory.id,
+                user_id: userId,
                 product_name: title,
                 description: description,
                 type: propertyType,
@@ -792,16 +902,23 @@ const AgentAddProperty = () => {
                 size: area,
                 map: mapLocation,
                 p_status: propertyStatus,
-                p_video: videoLink
+                p_video: videoLink,
+
             };
 
-            // ✅ EDIT MODE AUR ADD MODE KE LIYE DIFFERENT IMAGE HANDLING
+            // ✅ EDIT MODE: Sirf new images bhejo
             if (property) {
-                // EDIT MODE: Sirf new images bhejo, existing images ko preserve karo
                 propertyData.p_image = validNewImages;
                 console.log('📤 EDIT MODE: Sending only new images:', validNewImages.length);
+
+                // ✅ Agar existing images ki IDs bhejni hain (for deletion/replacement)
+                const existingImageIds = existingImages.map(photo => photo.img_id).filter(id => id);
+                if (existingImageIds.length > 0) {
+                    propertyData.existing_image_ids = existingImageIds.join(',');
+                    console.log('📤 Existing image IDs:', existingImageIds);
+                }
             } else {
-                // ADD MODE: Saari images bhejo
+                // ADD MODE: Saari new images bhejo
                 propertyData.p_image = validNewImages;
                 console.log('📤 ADD MODE: Sending all images:', validNewImages.length);
             }
@@ -879,125 +996,106 @@ const AgentAddProperty = () => {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps='handled'>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps='handled'
+
+            >
                 <Header
                     title={property ? "Edit Property" : "Add Property"}
-                    onBackPress={() => navigation.goBack()}
+                    onBackPress={() => {
+                        navigation.goBack()
+                        closeAllDropdowns();
+                    }}
                 />
 
                 <View style={{ padding: 20 }}>
-                    {/* ✅ Category Dropdown */}
+
+                    {/* ✅ Category Modal */}
+                    {/* ✅ Category Modal - React Native Element Dropdown */}
                     <Text style={{
                         fontSize: 16,
                         fontFamily: 'Inter-Medium',
                         color: colors.TextColorBlack,
                         marginBottom: 10,
                     }}>
-                        Category *
+                        Category
                     </Text>
 
-
-                    <View style={{ position: 'relative', marginBottom: 20 }}>
-                        <TouchableOpacity
-                            style={{
-                                borderWidth: 1,
-                                borderColor: '#ddd',
-                                borderRadius: 8,
-                                backgroundColor: '#f9f9f9',
-                                paddingHorizontal: 15,
-                                paddingVertical: 12,
-                                flexDirection: 'row',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                zIndex: 10,
-                            }}
-                            onPress={() => {
-                                setDropdownVisible(!dropdownVisible);
-                                setStateDropdownVisible(false); // Dusre dropdown band karo
-                                setCityDropdownVisible(false);
-                                setBudgetDropdownVisible(false);
-                            }}
-                        >
-                            <Text style={{
-                                fontSize: 16,
-                                fontFamily: 'Inter-Medium',
-                                color: selectedCategory ? colors.TextColorBlack : colors.PlaceHolderTextcolor,
-                            }}>
-                                {selectedCategory ? selectedCategory.category_name : 'Select Category'}
-                            </Text>
-                            <Ionicons
-                                name={dropdownVisible ? "chevron-up" : "chevron-down"}
-                                size={20}
-                                color="#666"
-                            />
-                        </TouchableOpacity>
-
-                        {dropdownVisible && (
-                            <TouchableWithoutFeedback onPress={() => setDropdownVisible(false)}>
+                    <Dropdown
+                        style={{
+                            borderWidth: 1,
+                            borderColor: '#ddd',
+                            borderRadius: 8,
+                            backgroundColor: '#f9f9f9',
+                            paddingHorizontal: 12,
+                            height: 50,
+                            marginBottom: 15,
+                        }}
+                        placeholderStyle={{
+                            fontSize: 16,
+                            fontFamily: 'Inter-Medium',
+                            color: colors.PlaceHolderTextcolor,
+                        }}
+                        selectedTextStyle={{
+                            fontSize: 16,
+                            fontFamily: 'Inter-Medium',
+                            color: colors.TextColorBlack,
+                        }}
+                        iconStyle={{
+                            width: 20,
+                            height: 20,
+                        }}
+                        data={listCategory.map(item => ({
+                            label: item.category_name,
+                            value: item.category_id,
+                        }))}
+                        maxHeight={200}
+                        labelField="label"
+                        valueField="value"
+                        placeholder="Select Category"
+                        value={selectedCategory?.category_id || null}
+                        onChange={item => {
+                            const selectedItem = listCategory.find(cat => cat.category_id === item.value);
+                            setSelectedCategory(selectedItem || null);
+                        }}
+                        containerStyle={{
+                            borderWidth: 1,
+                            borderColor: '#ddd',
+                            borderRadius: 8,
+                            backgroundColor: '#fff',
+                            marginTop: 8,
+                        }}
+                        itemTextStyle={{
+                            fontSize: 16,
+                            fontFamily: 'Inter-Medium',
+                            color: colors.TextColorBlack,
+                        }}
+                        activeColor="#f0f8ff"
+                        showsVerticalScrollIndicator={false}
+                        renderItem={(item, selected) => (
+                            <View>
                                 <View style={{
-                                    position: 'absolute',
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 0,
-                                    zIndex: 5,
+                                    paddingVertical: 8,
+                                    paddingHorizontal: 8,
+                                    backgroundColor: selected ? '#f0f8ff' : '#fff',
                                 }}>
-                                    {/* Empty touchable area to close dropdown */}
+                                    <Text style={{
+                                        fontSize: 16,
+                                        fontFamily: 'Inter-Medium',
+                                        color: colors.TextColorBlack,
+                                    }}>
+                                        {item.label}
+                                    </Text>
                                 </View>
-                            </TouchableWithoutFeedback>
-                        )}
-
-                        {dropdownVisible && (
-                            <View style={{
-                                position: 'absolute',
-                                top: 55,
-                                left: 0,
-                                right: 0,
-                                borderWidth: 1,
-                                borderColor: '#ddd',
-                                borderRadius: 8,
-                                backgroundColor: '#fff',
-                                maxHeight: 200,
-                                elevation: 5,
-                                shadowColor: '#000',
-                                shadowOffset: { width: 0, height: 2 },
-                                shadowOpacity: 0.25,
-                                shadowRadius: 3.84,
-                                zIndex: 1000,
-                            }}>
-                                <FlatList
-                                    data={listCategory}
-                                    keyExtractor={(item) => item.category_id.toString()}
-                                    showsVerticalScrollIndicator={false}
-                                    nestedScrollEnabled={true}
-                                    keyboardShouldPersistTaps='handled'
-                                    renderItem={({ item }) => (
-                                        <TouchableOpacity
-                                            style={{
-                                                paddingVertical: 12,
-                                                paddingHorizontal: 15,
-                                                borderBottomWidth: 1,
-                                                borderBottomColor: '#f0f0f0',
-                                                backgroundColor: selectedCategory?.category_id === item.category_id ? '#f0f8ff' : '#fff',
-                                            }}
-                                            onPress={() => {
-                                                setSelectedCategory(item);
-                                                setDropdownVisible(false);
-                                            }}
-                                        >
-                                            <Text style={{
-                                                fontSize: 16,
-                                                fontFamily: 'Inter-Medium',
-                                                color: colors.TextColorBlack,
-                                            }}>
-                                                {item.category_name}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    )}
-                                />
+                                {/* ✅ Divider add kiya */}
+                                <View style={{
+                                    height: 1,
+                                    backgroundColor: '#f0f0f0',
+                                }} />
                             </View>
                         )}
-                    </View>
+                    />
 
                     {/* Rest of your existing UI components remain same */}
                     {/* Property Type Selection */}
@@ -1007,7 +1105,7 @@ const AgentAddProperty = () => {
                         color: colors.TextColorBlack,
                         marginBottom: 10,
                     }}>
-                        Property Type *
+                        Property Type
                     </Text>
                     <View style={{
                         flexDirection: 'row',
@@ -1154,32 +1252,41 @@ const AgentAddProperty = () => {
                     </View>
 
                     {/* Price and Area Row */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 }}>
-                        <View style={{
-                            borderWidth: 1,
-                            borderColor: '#ddd',
-                            borderRadius: 8,
-                            backgroundColor: '#f9f9f9',
-                            paddingHorizontal: 12,
-                            width: '48%',
-                        }}>
-                            <TextInput
-                                style={{
-                                    paddingVertical: 12,
-                                    fontSize: 16,
-                                    fontFamily: 'Inter-Medium',
-                                    color: colors.TextColorBlack,
-                                }}
-                                placeholder="Price *"
-                                placeholderTextColor={colors.PlaceHolderTextcolor}
-                                value={price}
-                                onChangeText={(text) => {
-                                    setPrice(text);
-                                    setErrors(prev => ({ ...prev, price: '' })); // remove error on typing
-                                }}
-                                keyboardType="numeric"
-                            />
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+                        {/* Price Input with Error */}
+                        <View style={{ width: '48%' }}>
+                            <View style={{
+                                borderWidth: 1,
+                                borderColor: errors.price ? 'red' : '#ddd',
+                                borderRadius: 8,
+                                backgroundColor: '#f9f9f9',
+                                paddingHorizontal: 12,
+                            }}>
+                                <TextInput
+                                    style={{
+                                        paddingVertical: 12,
+                                        fontSize: 16,
+                                        fontFamily: 'Inter-Medium',
+                                        color: colors.TextColorBlack,
+                                    }}
+                                    placeholder="Price *"
+                                    placeholderTextColor={colors.PlaceHolderTextcolor}
+                                    value={price}
+                                    onChangeText={(text) => {
+                                        setPrice(text);
+                                        setErrors(prev => ({ ...prev, price: '' }));
+                                    }}
+                                    keyboardType="numeric"
+                                />
+                            </View>
+                            {errors.price && (
+                                <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>
+                                    {errors.price}
+                                </Text>
+                            )}
                         </View>
+
+                        {/* Area Input */}
                         <View style={{
                             borderWidth: 1,
                             borderColor: '#ddd',
@@ -1204,6 +1311,7 @@ const AgentAddProperty = () => {
                         </View>
                     </View>
 
+
                     {/* ✅ Budget Dropdown */}
 
                     <Text style={{
@@ -1214,108 +1322,82 @@ const AgentAddProperty = () => {
                     }}>
                         Budget Range
                     </Text>
-                    <View style={{ position: 'relative', marginBottom: 15 }}>
-                        <TouchableOpacity
-                            style={{
-                                borderWidth: 1,
-                                borderColor: '#ddd',
-                                borderRadius: 8,
-                                backgroundColor: '#f9f9f9',
-                                paddingHorizontal: 15,
-                                paddingVertical: 12,
-                                flexDirection: 'row',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                zIndex: 10,
-                            }}
-                            onPress={() => {
-                                setBudgetDropdownVisible(!budgetDropdownVisible);
-                                setDropdownVisible(false); // Dusre dropdown band karo
-                                setStateDropdownVisible(false);
-                                setCityDropdownVisible(false);
-                            }}
-                        >
-                            <Text style={{
-                                fontSize: 16,
-                                fontFamily: 'Inter-Medium',
-                                color: budget ? colors.TextColorBlack : colors.PlaceHolderTextcolor,
-                            }}>
-                                {budget || 'Select Budget Range'}
-                            </Text>
-                            <Ionicons
-                                name={budgetDropdownVisible ? "chevron-up" : "chevron-down"}
-                                size={20}
-                                color="#666"
-                            />
-                        </TouchableOpacity>
 
-                        {budgetDropdownVisible && (
-                            <TouchableWithoutFeedback onPress={() => setBudgetDropdownVisible(false)}>
+                    <Dropdown
+                        style={{
+                            borderWidth: 1,
+                            borderColor: '#ddd',
+                            borderRadius: 8,
+                            backgroundColor: '#f9f9f9',
+                            paddingHorizontal: 12,
+                            height: 50,
+                            marginBottom: 15,
+
+                        }}
+                        placeholderStyle={{
+                            fontSize: 16,
+                            fontFamily: 'Inter-Medium',
+                            color: colors.PlaceHolderTextcolor,
+                        }}
+                        selectedTextStyle={{
+                            fontSize: 16,
+                            fontFamily: 'Inter-Medium',
+                            color: colors.TextColorBlack,
+                        }}
+                        iconStyle={{
+                            width: 20,
+                            height: 20,
+                        }}
+                        data={budgetOptions.map(item => ({
+                            label: item,
+                            value: item,
+                        }))}
+                        maxHeight={200}
+                        labelField="label"
+                        valueField="value"
+                        placeholder="Select Budget Range"
+                        value={budget}
+                        onChange={item => {
+                            setBudget(item.value);
+                        }}
+                        containerStyle={{
+                            borderWidth: 1,
+                            borderColor: '#ddd',
+                            borderRadius: 8,
+                            backgroundColor: '#fff',
+                            marginTop: 8,
+                        }}
+                        itemTextStyle={{
+                            fontSize: 16,
+                            fontFamily: 'Inter-Medium',
+                            color: colors.TextColorBlack,
+                        }}
+                        activeColor="#f0f8ff"
+                        showsVerticalScrollIndicator={false}
+                        renderItem={(item, selected) => (
+                            <View>
                                 <View style={{
-                                    position: 'absolute',
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 0,
-                                    zIndex: 5,
+                                    paddingVertical: 8,
+                                    paddingHorizontal: 8,
+                                    backgroundColor: selected ? '#f0f8ff' : '#fff',
                                 }}>
-                                    {/* Empty touchable area to close dropdown */}
+                                    <Text style={{
+                                        fontSize: 16,
+                                        fontFamily: 'Inter-Medium',
+                                        color: colors.TextColorBlack,
+                                    }}>
+                                        {item.label}
+                                    </Text>
                                 </View>
-                            </TouchableWithoutFeedback>
-                        )}
+                                {/* ✅ Divider add kiya */}
+                                <View style={{
+                                    height: 1,
+                                    backgroundColor: '#f0f0f0',
 
-                        {budgetDropdownVisible && (
-                            <View style={{
-                                position: 'absolute',
-                                top: 55,
-                                left: 0,
-                                right: 0,
-                                borderWidth: 1,
-                                borderColor: '#ddd',
-                                borderRadius: 8,
-                                backgroundColor: '#fff',
-                                maxHeight: 200,
-                                elevation: 5,
-                                shadowColor: '#000',
-                                shadowOffset: { width: 0, height: 2 },
-                                shadowOpacity: 0.25,
-                                shadowRadius: 3.84,
-                                zIndex: 1000,
-                            }}>
-                                <FlatList
-                                    nestedScrollEnabled={true}
-                                    keyboardShouldPersistTaps='handled'
-
-                                    data={budgetOptions}
-                                    keyExtractor={(item) => item}
-                                    showsVerticalScrollIndicator={false}
-                                    renderItem={({ item }) => (
-                                        <TouchableOpacity
-                                            style={{
-                                                paddingVertical: 12,
-                                                paddingHorizontal: 15,
-                                                borderBottomWidth: 1,
-                                                borderBottomColor: '#f0f0f0',
-                                                backgroundColor: budget === item ? '#f0f8ff' : '#fff',
-                                            }}
-                                            onPress={() => {
-                                                setBudget(item);
-                                                setBudgetDropdownVisible(false);
-                                            }}
-                                        >
-                                            <Text style={{
-                                                fontSize: 16,
-                                                fontFamily: 'Inter-Medium',
-                                                color: colors.TextColorBlack,
-                                            }}>
-                                                {item}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    )}
-                                />
+                                }} />
                             </View>
                         )}
-                    </View>
+                    />
 
                     {/* ✅ Property Status */}
                     <Text style={{
@@ -1391,7 +1473,7 @@ const AgentAddProperty = () => {
                     </View>
 
                     {/* Location Details */}
-                    {/* Location Details */}
+
                     <Text style={{
                         fontSize: 18,
                         fontFamily: 'Inter-Bold',
@@ -1429,7 +1511,6 @@ const AgentAddProperty = () => {
                     </View>
                     {errors.location && <Text style={{ color: 'red', fontSize: 12, marginBottom: 10 }}>{errors.location}</Text>}
 
-                    {/* State Dropdown */}
                     <Text style={{
                         fontSize: 16,
                         fontFamily: 'Inter-Medium',
@@ -1438,117 +1519,101 @@ const AgentAddProperty = () => {
                     }}>
                         State *
                     </Text>
-                    {/* State Dropdown */}
-                    <View style={{ position: 'relative', marginBottom: 15 }}>
-                        <TouchableOpacity
-                            style={{
-                                borderWidth: 1,
-                                borderColor: errors.state ? 'red' : '#ddd',
-                                borderRadius: 8,
-                                backgroundColor: '#f9f9f9',
-                                paddingHorizontal: 15,
-                                paddingVertical: 12,
-                                flexDirection: 'row',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                            }}
-                            onPress={() => {
-                                setStateDropdownVisible(!stateDropdownVisible);
-                                setDropdownVisible(false); // Dusre dropdown band karo
-                                setCityDropdownVisible(false);
-                                setBudgetDropdownVisible(false);
-                            }}
-                        >
-                            <Text style={{
-                                fontSize: 16,
-                                fontFamily: 'Inter-Medium',
-                                color: selectedState ? colors.TextColorBlack : colors.PlaceHolderTextcolor,
-                            }}>
-                                {selectedState ? selectedState.state_name || selectedState.name : 'Select State'}
-                            </Text>
-                            <Ionicons
-                                name={stateDropdownVisible ? "chevron-up" : "chevron-down"}
-                                size={20}
-                                color="#666"
-                            />
-                        </TouchableOpacity>
 
-                        {stateDropdownVisible && (
-                            <TouchableWithoutFeedback onPress={() => setStateDropdownVisible(false)}>
+                    <Dropdown
+                        style={{
+                            borderWidth: 1,
+                            borderColor: errors.state ? 'red' : '#ddd',
+                            borderRadius: 8,
+                            backgroundColor: '#f9f9f9',
+                            paddingHorizontal: 12,
+                            height: 50,
+                            marginBottom: 15,
+                        }}
+                        placeholderStyle={{
+                            fontSize: 16,
+                            fontFamily: 'Inter-Medium',
+                            color: colors.PlaceHolderTextcolor,
+                        }}
+                        selectedTextStyle={{
+                            fontSize: 16,
+                            fontFamily: 'Inter-Medium',
+                            color: colors.TextColorBlack,
+                        }}
+                        inputSearchStyle={{
+                            height: 40,
+                            fontSize: 16,
+                            fontFamily: 'Inter-Regular',
+                            borderRadius: 8,
+                            color: colors.TextColorBlack,
+                        }}
+                        iconStyle={{
+                            width: 20,
+                            height: 20,
+                        }}
+                        data={states.map(item => ({
+                            label: item.state_name || item.name,
+                            value: item.id || item.id,
+                            originalItem: item // ✅ Original data access ke liye
+                        }))}
+                        search
+                        maxHeight={250}
+                        labelField="label"
+                        valueField="value"
+                        placeholder="Select State"
+                        searchPlaceholder="Search state..."
+                        value={selectedState?.id || null}
+                        onChange={item => {
+                            const selectedStateItem = states.find(state => state.id === item.value);
+                            setSelectedState(selectedStateItem);
+                            setSelectedCity(null);
+                            setCity('');
+                            setErrors(prev => ({ ...prev, state: '' }));
+                        }}
+                        containerStyle={{
+                            borderWidth: 1,
+                            borderColor: '#ddd',
+                            borderRadius: 8,
+                            backgroundColor: '#fff',
+                            marginTop: 8,
+                        }}
+                        itemTextStyle={{
+                            fontSize: 16,
+                            fontFamily: 'Inter-Medium',
+                            color: colors.TextColorBlack,
+                        }}
+                        activeColor="#f0f8ff"
+                        showsVerticalScrollIndicator={false}
+                        renderItem={(item, selected) => (
+                            <View>
                                 <View style={{
-                                    position: 'absolute',
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 0,
-                                    zIndex: 5,
+                                    paddingVertical: 8,
+                                    paddingHorizontal: 8,
+                                    backgroundColor: selected ? '#f0f8ff' : '#fff',
                                 }}>
-                                    {/* Empty touchable area to close dropdown */}
+                                    <Text style={{
+                                        fontSize: 16,
+                                        fontFamily: 'Inter-Medium',
+                                        color: colors.TextColorBlack,
+                                    }}>
+                                        {item.label}
+                                    </Text>
                                 </View>
-                            </TouchableWithoutFeedback>
-                        )}
-
-                        {stateDropdownVisible && (
-                            <View style={{
-                                position: 'absolute',
-                                top: 55,
-                                left: 0,
-                                right: 0,
-                                borderWidth: 1,
-                                borderColor: '#ddd',
-                                borderRadius: 8,
-                                backgroundColor: '#fff',
-                                maxHeight: 200,
-                                elevation: 5,
-                                zIndex: 1000,
-                            }}>
-                                <FlatList
-                                    data={states}
-                                    keyExtractor={(item) => (item.id || item.id).toString()}
-                                    showsVerticalScrollIndicator={false}
-                                    nestedScrollEnabled={true}
-                                    keyboardShouldPersistTaps='handled'
-                                    renderItem={({ item }) => {
-                                        // ✅ Correct comparison for selected state - FIXED
-                                        const isSelected = selectedState &&
-                                            (selectedState.id == item.id ||
-                                                selectedState.id == item.id);
-                                        console.log("state is selected ye hai", isSelected);
-
-                                        return (
-                                            <TouchableOpacity
-                                                style={{
-                                                    paddingVertical: 12,
-                                                    paddingHorizontal: 15,
-                                                    borderBottomWidth: 1,
-                                                    borderBottomColor: '#f0f0f0',
-                                                    backgroundColor: isSelected ? '#f0f8ff' : '#fff',
-                                                }}
-                                                onPress={() => {
-                                                    setSelectedState(item);
-                                                    setSelectedCity(null);
-                                                    setCity('');
-                                                    setStateDropdownVisible(false);
-                                                    setErrors(prev => ({ ...prev, state: '' }));
-                                                }}
-                                            >
-                                                <Text style={{
-                                                    fontSize: 16,
-                                                    fontFamily: 'Inter-Medium',
-                                                    color: colors.TextColorBlack,
-                                                }}>
-                                                    {item.state_name || item.name}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        );
-                                    }}
-                                />
+                                {/* ✅ Divider add kiya */}
+                                <View style={{
+                                    height: 1,
+                                    backgroundColor: '#f0f0f0',
+                                }} />
                             </View>
                         )}
-                    </View>
+                    />
+
+
                     {errors.state && <Text style={{ color: 'red', fontSize: 12, marginBottom: 10 }}>{errors.state}</Text>}
 
+
                     {/* City Dropdown */}
+
                     <Text style={{
                         fontSize: 16,
                         fontFamily: 'Inter-Medium',
@@ -1557,119 +1622,109 @@ const AgentAddProperty = () => {
                     }}>
                         City *
                     </Text>
-                    {/* City Dropdown */}
-                    <View style={{ position: 'relative', marginBottom: 15 }}>
-                        <TouchableOpacity
+
+                    <View style={{ position: 'relative' }}>
+                        <Dropdown
                             style={{
                                 borderWidth: 1,
                                 borderColor: errors.city ? 'red' : '#ddd',
                                 borderRadius: 8,
-                                backgroundColor: '#f9f9f9',
-                                paddingHorizontal: 15,
-                                paddingVertical: 12,
-                                flexDirection: 'row',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                opacity: selectedState ? 1 : 0.6,
+                                backgroundColor: selectedState ? '#f9f9f9' : '#f0f0f0',
+                                paddingHorizontal: 12,
+                                height: 50,
+                                marginBottom: 15,
                             }}
-                            onPress={() => {
-                                if (selectedState) {
-                                    setCityDropdownVisible(!cityDropdownVisible);
-                                    setDropdownVisible(false); // Dusre dropdown band karo
-                                    setStateDropdownVisible(false);
-                                    setBudgetDropdownVisible(false);
-                                }
-                            }}
-                            disabled={!selectedState}
-                        >
-                            <Text style={{
+                            placeholderStyle={{
                                 fontSize: 16,
                                 fontFamily: 'Inter-Medium',
-                                color: selectedCity ? colors.TextColorBlack : colors.PlaceHolderTextcolor,
-                            }}>
-                                {loadingCities ? 'Loading cities...' :
-                                    selectedCity ? selectedCity.city_name || selectedCity.name :
-                                        'Select City'}
-                            </Text>
-                            <Ionicons
-                                name={cityDropdownVisible ? "chevron-up" : "chevron-down"}
-                                size={20}
-                                color="#666"
-                            />
-                        </TouchableOpacity>
-
-                        {cityDropdownVisible && (
-                            <TouchableWithoutFeedback onPress={() => setCityDropdownVisible(false)}>
-                                <View style={{
-                                    position: 'absolute',
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 0,
-                                    zIndex: 5,
-                                }}>
-                                    {/* Empty touchable area to close dropdown */}
-                                </View>
-                            </TouchableWithoutFeedback>
-                        )}
-
-                        {cityDropdownVisible && selectedState && (
-                            <View style={{
-                                position: 'absolute',
-                                top: 55,
-                                left: 0,
-                                right: 0,
+                                color: selectedState ? colors.PlaceHolderTextcolor : '#999',
+                            }}
+                            selectedTextStyle={{
+                                fontSize: 16,
+                                fontFamily: 'Inter-Medium',
+                                color: colors.TextColorBlack,
+                            }}
+                            inputSearchStyle={{
+                                height: 40,
+                                fontSize: 16,
+                                fontFamily: 'Inter-Regular',
+                                borderRadius: 8,
+                                color: colors.TextColorBlack,
+                            }}
+                            iconStyle={{
+                                width: 20,
+                                height: 20,
+                            }}
+                            data={cities.map(item => ({
+                                label: item.city_name || item.name,
+                                value: item.id || item.id,
+                                originalItem: item
+                            }))}
+                            search
+                            maxHeight={250}
+                            labelField="label"
+                            valueField="value"
+                            placeholder={loadingCities ? "Loading cities..." : (selectedState ? "Select City" : "First select state")}
+                            searchPlaceholder="Search city..."
+                            value={selectedCity?.id || null}
+                            onChange={item => {
+                                const selectedCityItem = cities.find(city => city.id === item.value);
+                                setSelectedCity(selectedCityItem);
+                                setCity(selectedCityItem.city_name || selectedCityItem.name);
+                                setErrors(prev => ({ ...prev, city: '' }));
+                            }}
+                            onFocus={() => {
+                                if (!selectedState) {
+                                    return false;
+                                }
+                            }}
+                            containerStyle={{
                                 borderWidth: 1,
                                 borderColor: '#ddd',
                                 borderRadius: 8,
                                 backgroundColor: '#fff',
-                                maxHeight: 200,
-                                elevation: 5,
-                                zIndex: 1000,
-                            }}>
-                                <FlatList
-                                    data={cities}
-                                    keyExtractor={(item) => (item.id || item.id).toString()}
-                                    showsVerticalScrollIndicator={false}
-                                    nestedScrollEnabled={true}
-                                    keyboardShouldPersistTaps='handled'
-
-                                    renderItem={({ item }) => {
-                                        // ✅ Correct comparison for selected city - FIXED
-                                        const isSelected = selectedCity &&
-                                            (selectedCity.id == item.id ||
-                                                selectedCity.id == item.id);
-
-                                        return (
-                                            <TouchableOpacity
-                                                style={{
-                                                    paddingVertical: 12,
-                                                    paddingHorizontal: 15,
-                                                    borderBottomWidth: 1,
-                                                    borderBottomColor: '#f0f0f0',
-                                                    backgroundColor: isSelected ? '#f0f8ff' : '#fff',
-                                                }}
-                                                onPress={() => {
-                                                    setSelectedCity(item);
-                                                    setCity(item.city_name || item.name);
-                                                    setCityDropdownVisible(false);
-                                                    setErrors(prev => ({ ...prev, city: '' }));
-                                                }}
-                                            >
-                                                <Text style={{
-                                                    fontSize: 16,
-                                                    fontFamily: 'Inter-Medium',
-                                                    color: colors.TextColorBlack,
-                                                }}>
-                                                    {item.city_name || item.name}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        );
-                                    }}
-                                />
-                            </View>
-                        )}
+                                marginTop: 8,
+                            }}
+                            itemTextStyle={{
+                                fontSize: 16,
+                                fontFamily: 'Inter-Medium',
+                                color: colors.TextColorBlack,
+                            }}
+                            activeColor="#f0f8ff"
+                            showsVerticalScrollIndicator={false}
+                            disable={!selectedState || loadingCities}
+                            // ✅ Yeh add karo scroll issue fix karne ke liye
+                            flatListProps={{
+                                nestedScrollEnabled: true,
+                                keyboardShouldPersistTaps: 'handled',
+                                maintainVisibleContentPosition: {
+                                    minIndexForVisible: 0
+                                }
+                            }}
+                            renderItem={(item, selected) => (
+                                <View>
+                                    <View style={{
+                                        paddingVertical: 8,
+                                        paddingHorizontal: 8,
+                                        backgroundColor: selected ? '#f0f8ff' : '#fff',
+                                    }}>
+                                        <Text style={{
+                                            fontSize: 16,
+                                            fontFamily: 'Inter-Medium',
+                                            color: colors.TextColorBlack,
+                                        }}>
+                                            {item.label}
+                                        </Text>
+                                    </View>
+                                    <View style={{
+                                        height: 1,
+                                        backgroundColor: '#f0f0f0',
+                                    }} />
+                                </View>
+                            )}
+                        />
                     </View>
+
                     {errors.city && <Text style={{ color: 'red', fontSize: 12, marginBottom: 10 }}>{errors.city}</Text>}
 
 
@@ -1726,95 +1781,182 @@ const AgentAddProperty = () => {
                     </Text>
 
                     {/* Photos */}
-                    <Text style={{
-                        fontSize: 16,
-                        fontFamily: 'Inter-Medium',
-                        color: colors.TextColorBlack,
-                        marginBottom: 10,
+                    <View style={{
+                        marginBottom: 15,
+                        borderWidth: errors.photos ? 1 : 0,
+                        borderColor: errors.photos ? 'red' : 'transparent',
+                        borderRadius: 8,
+                        padding: errors.photos ? 12 : 0,
+                        backgroundColor: errors.photos ? '#FFF5F5' : 'transparent',
                     }}>
-                        Photos ({photos.length}/10)
-                    </Text>
+                        <Text style={{
+                            fontSize: 16,
+                            fontFamily: 'Inter-Medium',
+                            color: colors.TextColorBlack,
+                            marginBottom: 10,
+                        }}>
+                            Photos ({photos.length}/10)
+                        </Text>
 
-                    {/* ✅ Photo Upload Options */}
-                    <View style={{ flexDirection: 'row', marginBottom: 15, gap: 10 }}>
-                        <TouchableOpacity
-                            style={{
-                                flex: 1,
-                                backgroundColor: colors.AppColor,
-                                paddingVertical: 12,
-                                borderRadius: 8,
-                                alignItems: 'center',
+                        {/* ✅ Photo Upload Options */}
+                        <View style={{ flexDirection: 'row', marginBottom: 15, gap: 10 }}>
+                            <TouchableOpacity
+                                style={{
+                                    flex: 1,
+                                    backgroundColor: colors.AppColor,
+                                    paddingVertical: 12,
+                                    borderRadius: 8,
+                                    alignItems: 'center',
+                                    flexDirection: 'row',
+                                    justifyContent: 'center',
+                                }}
+                                onPress={handlePhotoUpload}
+                            >
+                                <Ionicons name="images-outline" size={20} color="#fff" />
+                                <Text style={{
+                                    fontSize: 14,
+                                    fontFamily: 'Inter-Medium',
+                                    color: '#fff',
+                                    marginLeft: 8,
+                                }}>
+                                    Gallery
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={{
+                                    flex: 1,
+                                    backgroundColor: '#4CAF50',
+                                    paddingVertical: 12,
+                                    borderRadius: 8,
+                                    alignItems: 'center',
+                                    flexDirection: 'row',
+                                    justifyContent: 'center',
+                                }}
+                                onPress={handleTakePhoto}
+                            >
+                                <Ionicons name="camera-outline" size={20} color="#fff" />
+                                <Text style={{
+                                    fontSize: 14,
+                                    fontFamily: 'Inter-Medium',
+                                    color: '#fff',
+                                    marginLeft: 8,
+                                }}>
+                                    Camera
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Photos Preview */}
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{
+                            marginBottom: 15,
+                        }}>
+                            {photos.map((photo) => (
+                                <View key={photo.id} style={{ position: 'relative', marginRight: 10 }}>
+                                    <Image
+                                        source={{ uri: photo.uri }}
+                                        style={{
+                                            width: 120,
+                                            height: 120,
+                                            borderRadius: 8,
+                                            opacity: deletingImageId === photo.id ? 0.5 : 1,
+                                        }}
+                                    />
+
+                                    {/* ✅ Existing Image Badge (Edit Mode) */}
+                                    {photo.isExisting && (
+                                        <View style={{
+                                            position: 'absolute',
+                                            top: 5,
+                                            left: 5,
+                                            backgroundColor: 'rgba(76, 175, 80, 0.9)',
+                                            paddingHorizontal: 6,
+                                            paddingVertical: 2,
+                                            borderRadius: 4,
+                                        }}>
+                                            <Text style={{
+                                                fontSize: 10,
+                                                fontFamily: 'Inter-Bold',
+                                                color: '#fff',
+                                            }}>
+                                                Existing
+                                            </Text>
+                                        </View>
+                                    )}
+
+                                    <TouchableOpacity
+                                        style={{
+                                            position: 'absolute',
+                                            top: 5,
+                                            right: 5,
+                                            backgroundColor: deletingImageId === photo.id ? '#ff6b6b' : 'rgba(0,0,0,0.7)',
+                                            borderRadius: 12,
+                                            width: 24,
+                                            height: 24,
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                        }}
+                                        onPress={() => removeMedia(photo.id, 'photo')}
+                                        disabled={deletingImageId === photo.id}
+                                    >
+                                        {deletingImageId === photo.id ? (
+                                            <ActivityIndicator size="small" color="#fff" />
+                                        ) : (
+                                            <Ionicons name="close" size={16} color="#fff" />
+                                        )}
+                                    </TouchableOpacity>
+
+                                    {/* Loading overlay */}
+                                    {deletingImageId === photo.id && (
+                                        <View style={{
+                                            position: 'absolute',
+                                            top: 0,
+                                            left: 0,
+                                            right: 0,
+                                            bottom: 0,
+                                            backgroundColor: 'rgba(0,0,0,0.3)',
+                                            borderRadius: 8,
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                        }}>
+                                            <ActivityIndicator size="small" color="#fff" />
+                                        </View>
+                                    )}
+                                </View>
+                            ))}
+                        </ScrollView>
+                        {/* ✅ Photos Error Message */}
+                        {errors.photos && (
+                            <View style={{
                                 flexDirection: 'row',
-                                justifyContent: 'center',
-                            }}
-                            onPress={handlePhotoUpload}
-                        >
-                            <Ionicons name="images-outline" size={20} color="#fff" />
-                            <Text style={{
-                                fontSize: 14,
-                                fontFamily: 'Inter-Medium',
-                                color: '#fff',
-                                marginLeft: 8,
-                            }}>
-                                Gallery
-                            </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={{
-                                flex: 1,
-                                backgroundColor: '#4CAF50',
-                                paddingVertical: 12,
-                                borderRadius: 8,
                                 alignItems: 'center',
-                                flexDirection: 'row',
-                                justifyContent: 'center',
-                            }}
-                            onPress={handleTakePhoto}
-                        >
-                            <Ionicons name="camera-outline" size={20} color="#fff" />
-                            <Text style={{
-                                fontSize: 14,
-                                fontFamily: 'Inter-Medium',
-                                color: '#fff',
-                                marginLeft: 8,
+                                marginTop: 5,
                             }}>
-                                Camera
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Photos Preview */}
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 15 }}>
-                        {photos.map((photo) => (
-                            <View key={photo.id} style={{ position: 'relative', marginRight: 10 }}>
-                                <Image
-                                    source={{ uri: photo.uri }}
-                                    style={{
-                                        width: 120,
-                                        height: 120,
-                                        borderRadius: 8,
-                                    }}
-                                />
-                                <TouchableOpacity
-                                    style={{
-                                        position: 'absolute',
-                                        top: 5,
-                                        right: 5,
-                                        backgroundColor: 'rgba(0,0,0,0.7)',
-                                        borderRadius: 12,
-                                        width: 24,
-                                        height: 24,
-                                        justifyContent: 'center',
-                                        alignItems: 'center',
-                                    }}
-                                    onPress={() => removeMedia(photo.id, 'photo')}
-                                >
-                                    <Ionicons name="close" size={16} color="#fff" />
-                                </TouchableOpacity>
+                                <Ionicons name="warning-outline" size={14} color="red" />
+                                <Text style={{
+                                    color: 'red',
+                                    fontSize: 12,
+                                    fontFamily: 'Inter-Regular',
+                                    marginLeft: 4,
+                                }}>
+                                    {errors.photos}
+                                </Text>
                             </View>
-                        ))}
-                    </ScrollView>
+                        )}
+
+                        {/* ✅ Photos Requirement Hint */}
+                        {photos.length === 0 && !errors.photos && (
+                            <Text style={{
+                                fontSize: 12,
+                                fontFamily: 'Inter-Regular',
+                                color: '#666',
+                                fontStyle: 'italic',
+                                marginTop: 5,
+                            }}>
+                                At least one photo is required
+                            </Text>
+                        )}
+                    </View>
 
                     {/* ✅ Video Link Section */}
                     <Text style={{
@@ -1863,6 +2005,8 @@ const AgentAddProperty = () => {
 
 
 
+
+
                     {/* Submit Button */}
                     <CustomButton
                         title={uploading ? "Uploading..." : (property ? "Update Property" : "Add Property")}
@@ -1872,8 +2016,22 @@ const AgentAddProperty = () => {
                         disabled={uploading}
                     />
 
+                    <ConfirmationModal
+                        visible={confirmationModalVisible}
+                        onClose={handleCloseModal}
+                        onConfirm={handleConfirmDelete}
+                        title="Delete Photo"
+                        message="Are you sure you want to delete this photo? This action cannot be undone."
+                        confirmText="Delete"
+                        cancelText="Cancel"
+                        type="delete"
+                    />
+
+
+
                 </View>
             </ScrollView>
+            <Bottomtab />
         </SafeAreaView>
     );
 };

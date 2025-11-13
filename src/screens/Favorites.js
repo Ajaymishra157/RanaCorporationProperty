@@ -6,99 +6,75 @@ import {
     ScrollView,
     Image,
     FlatList,
-    Alert
+    Alert,
+    ActivityIndicator,
+    RefreshControl,
+    ToastAndroid
 } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import colors from '../constants/Colors';
 import Header from '../components/Header';
+import ApiConstant from '../constants/ApiConstant';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Favorites = () => {
     const navigation = useNavigation();
     const [favorites, setFavorites] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
+    const [loading, setLoading] = useState(true);
 
-    // Sample favorites data
-    const sampleFavorites = [
-        {
-            id: 1,
-            title: 'Luxury 3BHK Apartment',
-            type: 'Apartment',
-            price: '₹85,00,000',
-            location: 'Sector 15, Gurgaon',
-            area: '1800 sq ft',
-            bedrooms: 3,
-            bathrooms: 2,
-            image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400',
-            addedDate: '2024-01-20',
-            views: 245,
-            isAvailable: true
-        },
-        {
-            id: 2,
-            title: 'Modern 2BHK Flat',
-            type: 'Flat',
-            price: '₹45,00,000',
-            location: 'DLF Phase 2',
-            area: '1200 sq ft',
-            bedrooms: 2,
-            bathrooms: 2,
-            image: 'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=400',
-            addedDate: '2024-01-18',
-            views: 189,
-            isAvailable: true
-        },
-        {
-            id: 3,
-            title: 'Spacious Villa',
-            type: 'Villa',
-            price: '₹2,50,00,000',
-            location: 'Sector 42',
-            area: '3500 sq ft',
-            bedrooms: 4,
-            bathrooms: 3,
-            image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400',
-            addedDate: '2024-01-15',
-            views: 567,
-            isAvailable: false
-        },
-        {
-            id: 4,
-            title: 'Penthouse with View',
-            type: 'Penthouse',
-            price: '₹3,50,00,000',
-            location: 'Golf Course Road',
-            area: '2800 sq ft',
-            bedrooms: 3,
-            bathrooms: 3,
-            image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=400',
-            addedDate: '2024-01-12',
-            views: 321,
-            isAvailable: true
+    // Load favorites from API
+    const loadFavorites = async () => {
+        try {
+            const customer_id = await AsyncStorage.getItem('id');
+            setRefreshing(true);
+            const response = await fetch(`${ApiConstant.URL}${ApiConstant.OtherURL.list_wishlist}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                // Add any required body parameters if needed
+                body: JSON.stringify({ customer_id: customer_id })
+            });
+
+            const result = await response.json();
+            console.log('Wishlist API Response:', result);
+
+            if (result.code == 200 && result.payload) {
+                // Filter out entries where property_id is null
+                const validFavorites = result.payload.filter(item => item.wishlist_id !== null);
+                setFavorites(validFavorites);
+            } else {
+                console.log(result.message || 'Failed to load favorites');
+                setFavorites([]);
+            }
+        } catch (error) {
+            console.log('Error loading favorites:', error);
+
+            setFavorites([]);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
         }
-    ];
-
-    // Load favorites on component mount
-    useEffect(() => {
-        loadFavorites();
-    }, []);
-
-    const loadFavorites = () => {
-        // In real app, you would fetch from AsyncStorage or API
-        setFavorites(sampleFavorites);
     };
+
+    // Load favorites when component mounts and when screen comes into focus
+    useFocusEffect(
+        React.useCallback(() => {
+            loadFavorites();
+        }, [])
+    );
 
     const handleRefresh = () => {
-        setRefreshing(true);
         loadFavorites();
-        setTimeout(() => setRefreshing(false), 1000);
     };
 
-    const removeFromFavorites = (propertyId) => {
+    const removeFromFavorites = (propertyId, propertyName) => {
         Alert.alert(
             'Remove from Favorites',
-            'Are you sure you want to remove this property from favorites?',
+            `Are you sure you want to remove "${propertyName}" from favorites?`,
             [
                 {
                     text: 'Cancel',
@@ -107,14 +83,46 @@ const Favorites = () => {
                 {
                     text: 'Remove',
                     style: 'destructive',
-                    onPress: () => {
-                        const updatedFavorites = favorites.filter(item => item.id !== propertyId);
-                        setFavorites(updatedFavorites);
-                        // Here you would also update in AsyncStorage or API
-                    }
+                    onPress: () => removeFromWishlist(propertyId)
                 }
             ]
         );
+    };
+
+    const removeFromWishlist = async (propertyId) => {
+        try {
+
+            const customer_id = await AsyncStorage.getItem('id');
+
+
+
+
+
+            const url = `${ApiConstant.URL}${ApiConstant.OtherURL.delete_wishlist}`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    customer_id: customer_id,
+                    p_id: propertyId
+                }),
+            });
+
+            const result = await response.json();
+            console.log("Remove wishlist response:", result);
+
+            if (result.code == 200) {
+
+
+                ToastAndroid.show("Property removed from wishlist", ToastAndroid.SHORT);
+                loadFavorites();
+            } else {
+                console.log(result.message || 'Failed to remove from wishlist');
+            }
+        } catch (error) {
+            console.log('Remove from wishlist error:', error);
+            console.log('Network request failed');
+        }
     };
 
     const clearAllFavorites = () => {
@@ -131,16 +139,55 @@ const Favorites = () => {
                 {
                     text: 'Clear All',
                     style: 'destructive',
-                    onPress: () => {
-                        setFavorites([]);
-                        // Here you would also clear from AsyncStorage or API
-                    }
+                    onPress: clearAllFavoritesAPI
                 }
             ]
         );
     };
 
-    // Render favorite property card
+    const clearAllFavoritesAPI = async () => {
+        try {
+            // You might need to implement a bulk delete API or delete one by one
+            // For now, we'll clear locally and show success message
+            setFavorites([]);
+            Alert.alert('Success', 'All favorites cleared successfully');
+
+            // If you have a bulk delete API, implement it here
+            // const response = await fetch(`${ApiConstant.URL}wishlist/clear_wishlist.php`, {
+            //     method: 'POST',
+            //     headers: {'Content-Type': 'application/json'},
+            //     body: JSON.stringify({ customer_id: '75' })
+            // });
+        } catch (error) {
+            console.log('Error clearing favorites:', error);
+            Alert.alert('Error', 'Failed to clear favorites');
+        }
+    };
+
+    // Format date to readable format
+    const formatDate = (dateString) => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+        });
+    };
+
+    // Get time ago from date
+    const getTimeAgo = (dateString) => {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffTime = Math.abs(now - date);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 1) return '1 day ago';
+        if (diffDays < 7) return `${diffDays} days ago`;
+        if (diffDays < 30) return `${Math.ceil(diffDays / 7)} weeks ago`;
+        return `${Math.ceil(diffDays / 30)} months ago`;
+    };
+
+    // Render favorite property card based on API response
     const renderFavoriteCard = ({ item }) => (
         <TouchableOpacity
             style={{
@@ -154,40 +201,48 @@ const Favorites = () => {
                 elevation: 3,
                 overflow: 'hidden',
             }}
-            onPress={() => navigation.navigate('PropertyDetail', { property: item })}
+        // onPress={() => {
+        //     if (item.property_id) {
+        //         navigation.navigate('PropertyDetail', {
+        //             propertyId: item.property_id,
+        //             propertyName: item.property_name
+        //         });
+        //     }
+        // }}
         >
             <View style={{ flexDirection: 'row' }}>
-                {/* Property Image */}
+                {/* Property Image - Using placeholder for now */}
                 <View style={{ position: 'relative' }}>
                     <Image
-                        source={{ uri: item.image }}
+                        source={{
+                            uri: item.property_image || 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400'
+                        }}
                         style={{
                             width: 120,
                             height: 120,
                         }}
                         resizeMode="cover"
+                        defaultSource={require('../assets/images/property1.jpg')}
                     />
 
-                    {/* Sold Out Badge */}
-                    {!item.isAvailable && (
-                        <View style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            backgroundColor: 'rgba(255,0,0,0.8)',
-                            paddingVertical: 4,
-                            alignItems: 'center',
+                    {/* Favorite Badge */}
+                    <View style={{
+                        position: 'absolute',
+                        top: 8,
+                        left: 8,
+                        backgroundColor: 'rgba(255,59,48,0.9)',
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 4,
+                    }}>
+                        <Text style={{
+                            fontSize: 10,
+                            fontFamily: 'Inter-Bold',
+                            color: '#fff',
                         }}>
-                            <Text style={{
-                                fontSize: 10,
-                                fontFamily: 'Inter-Bold',
-                                color: '#fff',
-                            }}>
-                                SOLD OUT
-                            </Text>
-                        </View>
-                    )}
+                            FAVORITE
+                        </Text>
+                    </View>
                 </View>
 
                 {/* Property Details */}
@@ -201,30 +256,30 @@ const Favorites = () => {
                             flex: 1,
                             marginRight: 10,
                         }}>
-                            {item.title}
+                            {item.property_name || 'Property Name Not Available'}
                         </Text>
 
                         <TouchableOpacity
                             style={{ padding: 4 }}
-                            onPress={() => removeFromFavorites(item.id)}
+                            onPress={() => removeFromFavorites(item.property_id, item.property_name)}
                         >
                             <Ionicons name="heart" size={20} color="#FF3B30" />
                         </TouchableOpacity>
                     </View>
 
-                    {/* Price */}
+                    {/* Property ID */}
                     <Text style={{
-                        fontSize: 18,
-                        fontFamily: 'Inter-Bold',
-                        color: colors.AppColor,
-                        marginVertical: 4,
+                        fontSize: 12,
+                        fontFamily: 'Inter-Regular',
+                        color: '#666',
+                        marginBottom: 4,
                     }}>
-                        {item.price}
+                        ID: {item.property_id || 'N/A'}
                     </Text>
 
-                    {/* Location */}
+                    {/* Customer Info */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                        <Ionicons name="location-outline" size={12} color="#666" />
+                        <Ionicons name="person-outline" size={12} color="#666" />
                         <Text style={{
                             fontSize: 12,
                             fontFamily: 'Inter-Regular',
@@ -232,97 +287,113 @@ const Favorites = () => {
                             marginLeft: 4,
                             flex: 1,
                         }}>
-                            {item.location}
+                            Added by: {item.customer_name}
                         </Text>
                     </View>
 
-                    {/* Property Features */}
+                    {/* Added Date */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
-                            <Ionicons name="bed-outline" size={12} color="#666" />
-                            <Text style={{
-                                fontSize: 11,
-                                fontFamily: 'Inter-Medium',
-                                color: colors.TextColorBlack,
-                                marginLeft: 4,
-                            }}>
-                                {item.bedrooms} Beds
-                            </Text>
-                        </View>
-
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
-                            <Ionicons name="water-outline" size={12} color="#666" />
-                            <Text style={{
-                                fontSize: 11,
-                                fontFamily: 'Inter-Medium',
-                                color: colors.TextColorBlack,
-                                marginLeft: 4,
-                            }}>
-                                {item.bathrooms} Baths
-                            </Text>
-                        </View>
-
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Ionicons name="resize-outline" size={12} color="#666" />
-                            <Text style={{
-                                fontSize: 11,
-                                fontFamily: 'Inter-Medium',
-                                color: colors.TextColorBlack,
-                                marginLeft: 4,
-                            }}>
-                                {item.area}
-                            </Text>
-                        </View>
+                        <Ionicons name="calendar-outline" size={12} color="#666" />
+                        <Text style={{
+                            fontSize: 11,
+                            fontFamily: 'Inter-Medium',
+                            color: colors.TextColorBlack,
+                            marginLeft: 4,
+                        }}>
+                            {formatDate(item.wishlist_entry_date)}
+                        </Text>
                     </View>
 
-                    {/* Added Date and Views */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    {/* Time Ago */}
+                    <View style={{
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginTop: 'auto'
+                    }}>
                         <Text style={{
                             fontSize: 10,
                             fontFamily: 'Inter-Regular',
                             color: '#999',
+                            fontStyle: 'italic',
                         }}>
-                            Added: {item.addedDate}
+                            {getTimeAgo(item.wishlist_entry_date)}
                         </Text>
 
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Ionicons name="eye-outline" size={10} color="#999" />
+                        {/* <View style={{
+                            backgroundColor: colors.AppColor + '20',
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
+                            borderRadius: 4,
+                        }}>
                             <Text style={{
                                 fontSize: 10,
-                                fontFamily: 'Inter-Regular',
-                                color: '#999',
-                                marginLeft: 4,
+                                fontFamily: 'Inter-Bold',
+                                color: colors.AppColor,
                             }}>
-                                {item.views} views
+                                Wishlist ID: {item.wishlist_id}
                             </Text>
-                        </View>
+                        </View> */}
                     </View>
                 </View>
             </View>
         </TouchableOpacity>
     );
 
+    // Loading state
+    if (loading) {
+        return (
+            <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
+                <Header
+                    title="My Favorites"
+                    onBackPress={() => navigation.goBack()}
+                />
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <ActivityIndicator size="large" color={colors.AppColor} />
+                    <Text style={{
+                        marginTop: 12,
+                        fontSize: 16,
+                        fontFamily: 'Inter-Medium',
+                        color: colors.TextColorBlack,
+                    }}>
+                        Loading your favorites...
+                    </Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={handleRefresh}
+                        colors={[colors.AppColor]}
+                        tintColor={colors.AppColor}
+                    />
+                }
+            >
                 {/* Header */}
                 <Header
                     title="My Favorites"
                     onBackPress={() => navigation.goBack()}
-                    rightComponent={
-                        favorites.length > 0 ? (
-                            <TouchableOpacity
-                                style={{
-                                    padding: 8,
-                                    borderRadius: 8,
-                                    backgroundColor: '#f8f9fa',
-                                }}
-                                onPress={clearAllFavorites}
-                            >
-                                <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-                            </TouchableOpacity>
-                        ) : null
-                    }
+                // rightComponent={
+                //     favorites.length > 0 ? (
+                //         <TouchableOpacity
+                //             style={{
+                //                 padding: 8,
+                //                 borderRadius: 8,
+                //                 backgroundColor: '#f8f9fa',
+                //             }}
+                //             onPress={clearAllFavorites}
+                //         >
+                //             <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+                //         </TouchableOpacity>
+                //     ) : null
+                // }
                 />
 
                 {/* Stats Card */}
@@ -431,11 +502,9 @@ const Favorites = () => {
                         <FlatList
                             data={favorites}
                             renderItem={renderFavoriteCard}
-                            keyExtractor={item => item.id.toString()}
+                            keyExtractor={item => item.wishlist_id.toString()}
                             showsVerticalScrollIndicator={false}
                             scrollEnabled={false}
-                            refreshing={refreshing}
-                            onRefresh={handleRefresh}
                         />
                     )}
                 </View>

@@ -7,6 +7,7 @@ import CustomButton from '../components/CustomButton';
 import CountryCodePicker from '../components/CountryCodePicker';
 import CustomAlert from '../components/CustomAlert';
 import ApiConstant from '../constants/ApiConstant';
+import Header from '../components/Header';
 
 const Registration = () => {
     const [name, setName] = useState('');
@@ -16,7 +17,7 @@ const Registration = () => {
     const [email, setEmail] = useState('');
     const [address, setAddress] = useState('');
     const [showPassword, setShowPassword] = useState(false);
-    const [userType, setUserType] = useState('Salesman');
+    const [userType, setUserType] = useState('Agent');
     const [countryCode, setCountryCode] = useState('+91');
     const [alternateCountryCode, setAlternateCountryCode] = useState('+91');
     const [alertVisible, setAlertVisible] = useState(false);
@@ -25,20 +26,36 @@ const Registration = () => {
     const [Loading, setLoading] = useState(false);
 
     const validateForm = () => {
+        let errors = [];
+
+        // Check all required fields
         if (!name.trim()) {
-            setAlertMessage('Please enter your name');
-            setAlertVisible(true);
-            return false;
+            errors.push('name');
         }
-
         if (!email.trim()) {
-            setAlertMessage('Please enter your email');
-            setAlertVisible(true);
-            return false;
+            errors.push('email');
+        }
+        if (!password.trim()) {
+            errors.push('password');
         }
 
-        if (!password.trim()) {
-            setAlertMessage('Please enter your password');
+        // If any required field is empty
+        if (errors.length > 0) {
+            if (errors.length === 3) {
+                setAlertMessage('All fields are required');
+            } else if (errors.length === 2) {
+                const fieldNames = errors.map(field => {
+                    if (field === 'name') return 'Name';
+                    if (field === 'email') return 'Email';
+                    if (field === 'password') return 'Password';
+                    return field;
+                });
+                setAlertMessage(`${fieldNames.join(' and ')} are required`);
+            } else {
+                const fieldName = errors[0] === 'name' ? 'Name' :
+                    errors[0] === 'email' ? 'Email' : 'Password';
+                setAlertMessage(`${fieldName} is required`);
+            }
             setAlertVisible(true);
             return false;
         }
@@ -85,7 +102,7 @@ const Registration = () => {
                     whatsapp_number: phoneNumber,
                     alternative_number: alternateNumber || null,
                     address: address.trim(),
-                    user_type: userType // 'Salesman' or 'Customer'
+                    user_type: userType // 'Agent' or 'Customer'
                 }),
             });
 
@@ -125,20 +142,11 @@ const Registration = () => {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f9f9f9' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', padding: 15 }}>
-                <TouchableOpacity
-                    onPress={handleBack}
-                    style={{
-                        padding: 8,
-                        borderRadius: 8,
-                        backgroundColor: '#fff',
-                    }}
-                >
-                    <Ionicons name="arrow-back" size={24} color={colors.TextColorBlack} />
-                </TouchableOpacity>
-
-            </View>
-            <ScrollView contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, paddingTop: 20 }} keyboardShouldPersistTaps='handled'>
+            <Header
+                title="Registration"
+                onBackPress={() => navigation.goBack()}
+            />
+            <ScrollView contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, paddingTop: 20, paddingBottom: 40 }} keyboardShouldPersistTaps='handled'>
 
                 {/* Header */}
                 <Text
@@ -168,11 +176,11 @@ const Registration = () => {
                             style={{
                                 paddingVertical: 10,
                                 paddingHorizontal: 30,
-                                backgroundColor: userType === 'Salesman' ? '#007AFF' : '#fff',
+                                backgroundColor: userType === 'Agent' ? '#007AFF' : '#fff',
                                 width: '50%', justifyContent: 'center', alignItems: 'center'
                             }}
-                            onPress={() => setUserType('Salesman')}>
-                            <Text style={{ color: userType === 'Salesman' ? '#fff' : '#007AFF', fontFamily: 'Inter-Bold' }}>
+                            onPress={() => setUserType('Agent')}>
+                            <Text style={{ color: userType === 'Agent' ? '#fff' : '#007AFF', fontFamily: 'Inter-Bold' }}>
                                 Agent
                             </Text>
                         </TouchableOpacity>

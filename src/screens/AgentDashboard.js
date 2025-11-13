@@ -5,11 +5,12 @@ import colors from '../constants/Colors';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ApiConstant from '../constants/ApiConstant';
+import Bottomtab from '../components/Bottomtab';
 
 const AgentDashboard = () => {
     const navigation = useNavigation();
     const [userName, setUserName] = useState('');
-    const [enquiryData, setEnquiryData] = useState([]);
+    const [countData, setCountData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [kycStatus, setKycStatus] = useState(null);
     const [showKYCLockScreen, setShowKYCLockScreen] = useState(false);
@@ -83,9 +84,9 @@ const AgentDashboard = () => {
 
             const result = await response.json();
             if (result.code === 200 && result.payload) {
-                setEnquiryData(result.payload);
+                setCountData(result.payload);
             } else {
-                setEnquiryData([]);
+                setCountData([]);
                 console.log('❌ Error: Failed to load data');
             }
         } catch (error) {
@@ -365,21 +366,21 @@ const AgentDashboard = () => {
                             {
                                 id: 1,
                                 title: 'Total Views',
-                                value: enquiryData?.view_property_count || '0',
+                                value: countData?.view_property_count || '0',
                                 icon: 'eye-outline',
                                 color: '#4CAF50',
                             },
                             {
                                 id: 2,
                                 title: 'Active Properties',
-                                value: enquiryData?.active_property_count || '0',
+                                value: countData?.active_property_count || '0',
                                 icon: 'business-outline',
                                 color: '#2196F3',
                             },
                             {
                                 id: 3,
                                 title: 'Active Enquiries',
-                                value: enquiryData?.active_enquiry_count || '0',
+                                value: countData?.active_enquiry_count || '0',
                                 icon: 'people-outline',
                                 color: '#FF9800',
                             },
@@ -543,6 +544,7 @@ const AgentDashboard = () => {
                     {/* ... existing code ... */}
                 </View>
             </ScrollView>
+            <Bottomtab />
         </SafeAreaView>
     );
 };

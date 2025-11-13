@@ -14,7 +14,7 @@ const Header = ({
         <View style={[{
             flexDirection: 'row',
             alignItems: 'center',
-            paddingHorizontal: 20,
+            paddingHorizontal: 12,
             paddingVertical: 15,
             borderBottomWidth: 1,
             borderBottomColor: '#f0f0f0',
@@ -26,12 +26,13 @@ const Header = ({
                 flex: 1,
                 flexDirection: 'row',
                 alignItems: 'flex-start',
+
             }}>
                 {showBackButton && (
                     <TouchableOpacity
                         onPress={onBackPress}
                         style={{
-                            padding: 8,
+                            padding: 3,
                             borderRadius: 8,
                             backgroundColor: '#f9f9f9',
                         }}

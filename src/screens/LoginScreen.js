@@ -1,4 +1,4 @@
-import { View, Text, TextInput, TouchableOpacity, SafeAreaView, ActivityIndicator, ToastAndroid } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, SafeAreaView, ActivityIndicator, ToastAndroid, Image } from 'react-native';
 import React, { useState } from 'react';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
@@ -73,8 +73,12 @@ const LoginScreen = () => {
                     ToastAndroid.show('Login Successfully', ToastAndroid.SHORT);
                     const Id = data.payload.id;
                     const username = data.payload.staff_name;
+                    const userType = data.payload.user_type;
+
                     await AsyncStorage.setItem('id', Id);
                     await AsyncStorage.setItem('staff_name', username);
+                    await AsyncStorage.setItem('user_type', userType);
+
 
 
                     navigation.reset({
@@ -143,8 +147,10 @@ const LoginScreen = () => {
                             color: colors.TextColorBlack,
                         }}
                         placeholder="Enter Mobile"
+                        keyboardType='number-pad'
                         placeholderTextColor={colors.PlaceHolderTextcolor}
                         value={email}
+                        maxLength={10}
                         onChangeText={setEmail}
                         autoCapitalize="words"
                     />

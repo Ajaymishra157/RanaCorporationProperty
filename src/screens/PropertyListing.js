@@ -17,6 +17,8 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import colors from '../constants/Colors';
 import Header from '../components/Header';
 import ApiConstant from '../constants/ApiConstant';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Bottomtab from '../components/Bottomtab';
 
 const PropertyListing = () => {
     const navigation = useNavigation();
@@ -80,7 +82,16 @@ const PropertyListing = () => {
         setLoading(true);
         setRefreshing(true);
         try {
-            const requestBody = {};
+            // const requestBody = {};
+            // ✅ User ID AsyncStorage se lo
+            const userId = await AsyncStorage.getItem('id');
+
+            const requestBody = {
+                p_id: "",  // ✅ Blank p_id
+                user_id: userId  // ✅ User ID add karo
+            };
+
+
 
             // Agar filters hain to request body mein add karo
             if (filters.p_status && filters.p_status !== 'all') {
@@ -106,7 +117,8 @@ const PropertyListing = () => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: Object.keys(requestBody).length > 0 ? JSON.stringify(requestBody) : null,
+                body: JSON.stringify(requestBody),
+                // body: Object.keys(requestBody).length > 0 ? JSON.stringify(requestBody) : null,
             });
 
             const result = await response.json();
@@ -167,17 +179,17 @@ const PropertyListing = () => {
     };
 
     // Handle status filter change
+    // Handle status filter change - Only UI filtering, no API call
     const handleStatusFilter = (status) => {
         setFilter(status);
-
-        const newFilters = {
-            ...filterOptions,
-            p_status: status === 'all' ? '' : status
-        };
-
-        setFilterOptions(newFilters);
-        ListPropertyApi(newFilters);
+        // ✅ No API call, only UI state change
     };
+
+    // Filtered properties based on selected tab
+    const filteredProperties = listProperty.filter(property => {
+        if (filter === 'all') return true;
+        return property.p_status === filter;
+    });
 
     // Get status color
     const getStatusColor = (status) => {
@@ -641,7 +653,7 @@ const PropertyListing = () => {
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
 
             {/* Loader Overlay */}
-            {loading && (
+            {/* {loading && (
                 <View
                     style={{
                         position: 'absolute',
@@ -667,7 +679,7 @@ const PropertyListing = () => {
                         Loading properties...
                     </Text>
                 </View>
-            )}
+            )} */}
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}
                 refreshControl={
                     <RefreshControl
@@ -801,22 +813,7 @@ const PropertyListing = () => {
                         </Text>
                     </View>
 
-                    <View style={{ alignItems: 'center', flex: 1 }}>
-                        <Text style={{
-                            fontSize: 20,
-                            fontFamily: 'Inter-Bold',
-                            color: '#4CAF50',
-                        }}>
-                            {listProperty.filter(p => p.p_status === 'Sold').length}
-                        </Text>
-                        <Text style={{
-                            fontSize: 12,
-                            fontFamily: 'Inter-Regular',
-                            color: '#666',
-                        }}>
-                            Sold
-                        </Text>
-                    </View>
+
 
                     <View style={{ alignItems: 'center', flex: 1 }}>
                         <Text style={{
@@ -851,6 +848,22 @@ const PropertyListing = () => {
                             Rented
                         </Text>
                     </View>
+                    <View style={{ alignItems: 'center', flex: 1 }}>
+                        <Text style={{
+                            fontSize: 20,
+                            fontFamily: 'Inter-Bold',
+                            color: '#4CAF50',
+                        }}>
+                            {listProperty.filter(p => p.p_status === 'Sold').length}
+                        </Text>
+                        <Text style={{
+                            fontSize: 12,
+                            fontFamily: 'Inter-Regular',
+                            color: '#666',
+                        }}>
+                            Sold
+                        </Text>
+                    </View>
                 </View>
 
                 {/* Filter Tabs */}
@@ -865,8 +878,8 @@ const PropertyListing = () => {
                     {[
                         { key: 'all', label: 'All' },
                         { key: 'Available', label: 'Available' },
+                        { key: 'Rented', label: 'Rented' },
                         { key: 'Sold', label: 'Sold' },
-                        { key: 'Rented', label: 'Rented' }
                     ].map((tab) => (
                         <TouchableOpacity
                             key={tab.key}
@@ -891,37 +904,101 @@ const PropertyListing = () => {
                 </View>
 
                 {/* Loading State */}
-                {loading && (
+                {/* {loading && (
                     <View style={{ padding: 20, alignItems: 'center' }}>
                         <Text>Loading properties...</Text>
                     </View>
-                )}
+                )} */}
 
                 {/* Properties List */}
                 <View style={{ padding: 10, flex: 1, }}>
-                    <FlatList
-                        data={listProperty}
-                        renderItem={renderPropertyCard}
-                        keyExtractor={item => item.p_id.toString()}
-                        showsVerticalScrollIndicator={false}
-                        scrollEnabled={false}
-                        refreshControl={
-                            <RefreshControl
-                                refreshing={refreshing}
-                                onRefresh={onRefresh}
-                                colors={['#2196F3']} // optional spinner color
-                            />
-                        }
-                        ListEmptyComponent={
-                            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 50 }}>
-                                <Image
-                                    source={require('../assets/images/Property.png')} // 👈 apna image path
-                                    style={{ width: 100, height: 100, marginBottom: 15, resizeMode: 'contain' }}
+                    {loading ? (
+                        <View style={{
+                            padding: 40,
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}>
+                            <Ionicons name="hourglass-outline" size={40} color={colors.AppColor} />
+                            <Text style={{
+                                marginTop: 12,
+                                fontSize: 14,
+                                fontFamily: 'Inter-Medium',
+                                color: colors.AppColor,
+                            }}>
+                                Loading properties...
+                            </Text>
+                        </View>
+                    ) : (
+                        <FlatList
+                            data={filteredProperties}
+                            renderItem={renderPropertyCard}
+                            keyExtractor={item => item.p_id.toString()}
+                            showsVerticalScrollIndicator={false}
+                            scrollEnabled={false}
+                            refreshControl={
+                                <RefreshControl
+                                    refreshing={refreshing}
+                                    onRefresh={onRefresh}
+                                    colors={['#2196F3']} // optional spinner color
                                 />
-                                <Text style={{ fontSize: 16, color: colors.red }}>No Property Yet</Text>
-                            </View>
-                        }
-                    />
+                            }
+                            ListEmptyComponent={
+                                !loading && listProperty.length === 0 ? (
+                                    <View style={{
+                                        flex: 1,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        paddingVertical: 50
+                                    }}>
+                                        <Image
+                                            source={require('../assets/images/Property.png')}
+                                            style={{
+                                                width: 100,
+                                                height: 100,
+                                                marginBottom: 15,
+                                                resizeMode: 'contain'
+                                            }}
+                                        />
+                                        <Text style={{
+                                            fontSize: 16,
+                                            color: colors.red,
+                                            fontFamily: 'Inter-Medium'
+                                        }}>
+                                            No Property Yet
+                                        </Text>
+                                        <Text style={{
+                                            fontSize: 14,
+                                            color: '#666',
+                                            marginTop: 8,
+                                            textAlign: 'center',
+                                            fontFamily: 'Inter-Regular'
+                                        }}>
+                                            Start by adding your first property
+                                        </Text>
+                                        <TouchableOpacity
+                                            style={{
+                                                backgroundColor: colors.AppColor,
+                                                paddingHorizontal: 20,
+                                                paddingVertical: 10,
+                                                borderRadius: 8,
+                                                marginTop: 15
+                                            }}
+                                            onPress={() => navigation.navigate('AgentAddProperty')}
+                                        >
+                                            <Text style={{
+                                                fontSize: 14,
+                                                color: '#fff',
+                                                fontFamily: 'Inter-Medium'
+                                            }}>
+                                                Add First Property
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ) : null
+                            }
+
+                        />
+                    )}
                 </View>
 
 
@@ -1020,6 +1097,7 @@ const PropertyListing = () => {
                 {/* Filter Modal */}
                 {renderFilterModal()}
             </ScrollView>
+            <Bottomtab />
         </SafeAreaView>
     );
 };

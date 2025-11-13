@@ -15,6 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import colors from '../constants/Colors'
 import KYCVerification from '../screens/KYCVerification'
 import ViewLeads from '../screens/ViewLeads'
+import CustomerEnquiry from '../screens/CustomerEnquiry'
 
 const Stack = createNativeStackNavigator()
 
@@ -103,6 +104,13 @@ const RouteNavigation = () => {
                     component={ViewLeads}
                     options={{ headerShown: false }}
                 />
+                <Stack.Screen
+                    name="CustomerEnquiry"
+                    component={CustomerEnquiry}
+                    options={{ headerShown: false }}
+                />
+
+
 
 
 

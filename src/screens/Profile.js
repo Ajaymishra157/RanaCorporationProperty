@@ -15,6 +15,7 @@ import Header from '../components/Header';
 import LogoutModal from '../components/LogoutModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ApiConstant from '../constants/ApiConstant';
+import Bottomtab from '../components/Bottomtab';
 
 const Profile = () => {
     const navigation = useNavigation();
@@ -543,6 +544,7 @@ const Profile = () => {
                 onClose={cancelLogout}
                 onConfirm={confirmLogout}
             />
+            <Bottomtab />
         </SafeAreaView>
     );
 };
