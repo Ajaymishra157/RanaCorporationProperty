@@ -75,16 +75,22 @@ const AgentDashboard = () => {
 
         setLoading(true);
         try {
+            const agent_id = await AsyncStorage.getItem('id');
             const response = await fetch(`${ApiConstant.URL}${ApiConstant.OtherURL.count_view_property}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
+                body: JSON.stringify({
+                    agent_id: agent_id,
+
+                }),
             });
 
             const result = await response.json();
-            if (result.code === 200 && result.payload) {
+            if (result.code == 200 && result.payload) {
                 setCountData(result.payload);
+                console.log("data aya kya");
             } else {
                 setCountData([]);
                 console.log('❌ Error: Failed to load data');

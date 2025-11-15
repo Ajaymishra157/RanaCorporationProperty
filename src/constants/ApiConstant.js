@@ -11,6 +11,8 @@ const ApiConstant = {
         list_user: 'user/list_user.php',
         add_kyc: 'user/add_kyc.php',
         check_kyc: 'user/check_kyc.php',
+        update_user: 'user/update_user.php',
+
 
 
 
@@ -32,14 +34,24 @@ const ApiConstant = {
         change_enquiry_status: 'enquiry/change_enquiry_status.php',
 
 
+
+
         list_review: 'rating_review/list_review.php',
 
         count_view_property: 'count_view_property.php',
 
+        // Wishlist ki apis
         list_wishlist: 'wishlist/list_wishlist.php',
         add_wishlist: 'wishlist/add_wishlist.php',
         check_wishlist: 'wishlist/check_wishlist.php',
         delete_wishlist: 'wishlist/delete_wishlist.php',
+
+
+        // scheduleVisit ki apis
+        add_scheadule: 'schedule/add_scheadule.php',
+
+        // Dynamic UserType Ke Liye
+        user_type: 'user/user_type.php',
 
 
 

@@ -16,6 +16,9 @@ import colors from '../constants/Colors'
 import KYCVerification from '../screens/KYCVerification'
 import ViewLeads from '../screens/ViewLeads'
 import CustomerEnquiry from '../screens/CustomerEnquiry'
+import CustomerScreen from '../screens/CustomerScreen'
+import PostProperty from '../screens/PostProperty'
+import EditProfile from '../screens/EditProfile'
 
 const Stack = createNativeStackNavigator()
 
@@ -25,12 +28,21 @@ const RouteNavigation = () => {
 
     useEffect(() => {
         const checkLoginStatus = async () => {
-            const id = await AsyncStorage.getItem('id');
+            try {
+                const id = await AsyncStorage.getItem('id'); // login ke time store kiya id
+                const type = await AsyncStorage.getItem('user_type'); // login ke time store kiya type: "Customer" ya "Agent"
 
-
-            if (id) {
-                setInitialRoute('AgentDashboard');
-            } else {
+                if (id && type) {
+                    if (type == 'Customer') {
+                        setInitialRoute('CustomerScreen');
+                    } else {
+                        setInitialRoute('AgentDashboard');
+                    }
+                } else {
+                    setInitialRoute('LoginScreen');
+                }
+            } catch (error) {
+                console.log('Error checking login status:', error);
                 setInitialRoute('LoginScreen');
             }
         };
@@ -109,6 +121,29 @@ const RouteNavigation = () => {
                     component={CustomerEnquiry}
                     options={{ headerShown: false }}
                 />
+
+                <Stack.Screen
+                    name="CustomerScreen"
+                    component={CustomerScreen}
+                    options={{ headerShown: false }}
+                />
+
+                <Stack.Screen
+                    name="PostProperty"
+                    component={PostProperty}
+                    options={{ headerShown: false }}
+                />
+
+                <Stack.Screen
+                    name="EditProfile"
+                    component={EditProfile}
+                    options={{ headerShown: false }}
+                />
+
+
+
+
+
 
 
 

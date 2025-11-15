@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     Modal,
     TouchableOpacity,
     View,
     Text,
-    StyleSheet
+    StyleSheet,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import colors from '../constants/Colors';
@@ -16,99 +16,196 @@ const StatusModal = ({
     position = { top: 0, left: 0 },
     selectedLead = null
 }) => {
-    if (!visible) return null;
+    // ✅ States for both modals
+    const [showConfirmation, setShowConfirmation] = useState(false);
+    const [selectedStatus, setSelectedStatus] = useState('');
 
     const statusOptions = [
-        { label: 'Approve', value: 'Approve', color: '#2e7d32' },
-        { label: 'Reject', value: 'Reject', color: '#c62828' },
-        { label: 'Pending', value: 'Pending', color: '#ef6c00' }
+        { label: 'Approve', value: 'Approve', color: '#2e7d32', icon: 'checkmark-circle' },
+        { label: 'Reject', value: 'Reject', color: '#c62828', icon: 'close-circle' },
+        { label: 'Pending', value: 'Pending', color: '#ef6c00', icon: 'time' }
     ];
 
     const handleStatusSelect = (status) => {
+        // ✅ Store status and show confirmation
+        setSelectedStatus(status);
+        setShowConfirmation(true);
+    };
+
+    const handleConfirmStatusChange = () => {
+        // ✅ Confirm status change
         if (onStatusChange) {
-            onStatusChange(status);
+            onStatusChange(selectedStatus);
+        }
+        setShowConfirmation(false);
+        setSelectedStatus('');
+        onClose(); // ✅ Close both modals
+    };
+
+    const handleCloseConfirmation = () => {
+        // ✅ Cancel confirmation
+        setShowConfirmation(false);
+        setSelectedStatus('');
+    };
+
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'Approve': return '#2e7d32';
+            case 'Reject': return '#c62828';
+            case 'Pending': return '#ef6c00';
+            default: return colors.AppColor;
         }
     };
 
-    // ✅ Current lead ka status get karo
     const currentStatus = selectedLead?.status;
 
     return (
-        <Modal
-            visible={visible}
-            transparent={true}
-            animationType="fade"
-            onRequestClose={onClose}
-        >
-            {/* Background Overlay */}
-            <TouchableOpacity
-                style={styles.overlay}
-                activeOpacity={1}
-                onPress={onClose}
+        <>
+            {/* ✅ MAIN STATUS MODAL */}
+            <Modal
+                visible={visible && !showConfirmation}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={onClose}
             >
-                {/* Modal Content - Position based on touch */}
-                <View style={[
-                    styles.modalContainer,
-                    {
-                        top: position.top,
-                        left: position.left
-                    }
-                ]}>
-                    <Text style={styles.modalTitle}>
-                        Update Status
-                    </Text>
+                <TouchableOpacity
+                    style={styles.overlay}
+                    activeOpacity={1}
+                    onPress={onClose}
+                >
+                    <View style={[
+                        styles.modalContainer,
+                        {
+                            top: position.top,
+                            left: position.left
+                        }
+                    ]}>
+                        <Text style={styles.modalTitle}>Update Status</Text>
 
-                    {/* Current Lead Info */}
-                    {selectedLead && (
-                        <View style={styles.leadInfo}>
-                            <Text style={styles.leadName}>
-                                {selectedLead.name || 'No Name'}
-                            </Text>
-                            <Text style={styles.leadId}>
-                                ID: {selectedLead.enquiry_id}
+                        {selectedLead && (
+                            <View style={styles.leadInfo}>
+                                <Text style={styles.leadName}>
+                                    {selectedLead.name || 'No Name'}
+                                </Text>
+                                <Text style={styles.leadId}>
+                                    ID: {selectedLead.enquiry_id}
+                                </Text>
+                            </View>
+                        )}
+
+                        <View style={styles.optionsContainer}>
+                            {statusOptions.map((option) => (
+                                <TouchableOpacity
+                                    key={option.value}
+                                    style={[
+                                        styles.optionButton,
+                                        currentStatus === option.value && styles.selectedOption
+                                    ]}
+                                    onPress={() => handleStatusSelect(option.value)}
+                                >
+                                    <View style={styles.optionLeft}>
+                                        <View
+                                            style={[
+                                                styles.statusIndicator,
+                                                { backgroundColor: option.color }
+                                            ]}
+                                        />
+                                        <Text style={styles.optionText}>
+                                            {option.label}
+                                        </Text>
+                                    </View>
+
+                                    {currentStatus === option.value && (
+                                        <Ionicons
+                                            name="checkmark"
+                                            size={18}
+                                            color={colors.AppColor}
+                                        />
+                                    )}
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
+                </TouchableOpacity>
+            </Modal>
+
+            {/* ✅ CONFIRMATION MODAL - SAME COMPONENT */}
+            <Modal
+                visible={showConfirmation}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={handleCloseConfirmation}
+            >
+                <View style={styles.confirmationOverlay}>
+                    <View style={styles.confirmationContainer}>
+                        {/* Header */}
+                        <View style={styles.confirmationHeader}>
+                            <Ionicons
+                                name="warning"
+                                size={24}
+                                color="#ff9800"
+                            />
+                            <Text style={styles.confirmationTitle}>
+                                Confirm Status Change
                             </Text>
                         </View>
-                    )}
 
-                    {/* Status Options with Tick Mark */}
-                    <View style={styles.optionsContainer}>
-                        {statusOptions.map((option) => (
+                        {/* Lead Info */}
+                        <View style={styles.leadInfoSection}>
+                            <Text style={styles.leadInfoText}>
+                                Lead: <Text style={styles.leadName}>{selectedLead?.name || 'Unknown Lead'}</Text>
+                            </Text>
+
+                        </View>
+
+                        {/* Status Change Info */}
+                        {/* <View style={styles.statusChangeSection}>
+                            <View style={styles.statusIndicator}>
+                                <Ionicons
+                                    name={statusOptions.find(opt => opt.value === selectedStatus)?.icon || 'help-circle'}
+                                    size={20}
+                                    color={getStatusColor(selectedStatus)}
+                                />
+                                <Text style={[
+                                    styles.statusText,
+                                    { color: getStatusColor(selectedStatus) }
+                                ]}>
+                                    Change to: {selectedStatus}
+                                </Text>
+                            </View>
+                        </View> */}
+
+                        {/* Message */}
+                        <Text style={styles.confirmationMessage}>
+                            Are you sure you want to update the status?
+                        </Text>
+
+                        {/* Buttons */}
+                        <View style={styles.confirmationButtons}>
                             <TouchableOpacity
-                                key={option.value}
-                                style={[
-                                    styles.optionButton,
-                                    currentStatus === option.value && styles.selectedOption
-                                ]}
-                                onPress={() => handleStatusSelect(option.value)}
+                                style={[styles.button, styles.cancelButton]}
+                                onPress={handleCloseConfirmation}
                             >
-                                <View style={styles.optionLeft}>
-                                    <View style={[
-                                        styles.statusIndicator,
-                                        { backgroundColor: option.color }
-                                    ]} />
-                                    <Text style={styles.optionText}>
-                                        {option.label}
-                                    </Text>
-                                </View>
-
-                                {/* ✅ TICK MARK - Agar current status hai to dikhao */}
-                                {currentStatus === option.value && (
-                                    <Ionicons
-                                        name="checkmark"
-                                        size={18}
-                                        color={colors.AppColor}
-                                    />
-                                )}
+                                <Text style={styles.cancelButtonText}>Cancel</Text>
                             </TouchableOpacity>
-                        ))}
+
+                            <TouchableOpacity
+                                style={[styles.button, styles.confirmButton]}
+                                onPress={handleConfirmStatusChange}
+                            >
+                                <Ionicons name="checkmark" size={18} color="#fff" />
+                                <Text style={styles.confirmButtonText}>Confirm</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
-            </TouchableOpacity>
-        </Modal>
+            </Modal>
+        </>
     );
 };
 
 const styles = StyleSheet.create({
+    // ✅ Original Modal Styles
     overlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.3)',
@@ -117,12 +214,9 @@ const styles = StyleSheet.create({
         position: 'absolute',
         backgroundColor: colors.TextColorWhite,
         borderRadius: 12,
-        padding: 16,
+        padding: 10,
         shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2
-        },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
         shadowRadius: 4,
         elevation: 5,
@@ -133,10 +227,10 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontFamily: 'Inter-Bold',
         color: colors.TextColorBlack,
-        marginBottom: 12,
+        marginBottom: 5,
     },
     leadInfo: {
-        marginBottom: 12,
+        marginBottom: 5,
         paddingBottom: 8,
         borderBottomWidth: 1,
         borderBottomColor: '#f0f0f0',
@@ -159,7 +253,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: 10,
+        paddingVertical: 5,
         paddingHorizontal: 8,
         borderRadius: 6,
     },
@@ -184,6 +278,100 @@ const styles = StyleSheet.create({
         fontFamily: 'Inter-Medium',
         color: colors.TextColorBlack,
         flex: 1,
+    },
+
+    // ✅ Confirmation Modal Styles
+    confirmationOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    confirmationContainer: {
+        backgroundColor: colors.TextColorWhite,
+        borderRadius: 16,
+        padding: 20,
+        width: '100%',
+        maxWidth: 350,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 10,
+    },
+    confirmationHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 15,
+    },
+    confirmationTitle: {
+        fontSize: 18,
+        fontFamily: 'Inter-Bold',
+        color: colors.TextColorBlack,
+        marginLeft: 10,
+    },
+    leadInfoSection: {
+        backgroundColor: '#f8f9fa',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 15,
+    },
+    leadInfoText: {
+        fontSize: 14,
+        fontFamily: 'Inter-Regular',
+        color: colors.Grey,
+        marginBottom: 4,
+    },
+    statusChangeSection: {
+        marginBottom: 15,
+
+    },
+    statusText: {
+        fontSize: 16,
+        fontFamily: 'Inter-Bold',
+        marginLeft: 8,
+
+    },
+    confirmationMessage: {
+        fontSize: 14,
+        fontFamily: 'Inter-Regular',
+        color: colors.Grey,
+        textAlign: 'center',
+        marginBottom: 20,
+        lineHeight: 20,
+    },
+    confirmationButtons: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: 12,
+    },
+    button: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 8,
+        gap: 8,
+    },
+    cancelButton: {
+        backgroundColor: '#f8f8f8',
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+    },
+    confirmButton: {
+        backgroundColor: colors.AppColor,
+    },
+    cancelButtonText: {
+        fontSize: 14,
+        fontFamily: 'Inter-Medium',
+        color: colors.Grey,
+    },
+    confirmButtonText: {
+        fontSize: 14,
+        fontFamily: 'Inter-Medium',
+        color: '#fff',
     },
 });
 

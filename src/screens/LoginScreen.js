@@ -80,10 +80,15 @@ const LoginScreen = () => {
                     await AsyncStorage.setItem('user_type', userType);
 
 
+                    // Navigate based on user type
+                    let initialScreen = 'AgentDashboard'; // default
+                    if (userType === 'Customer') {
+                        initialScreen = 'CustomerScreen';
+                    }
 
                     navigation.reset({
                         index: 0, // Reset the stack
-                        routes: [{ name: 'AgentDashboard' }], // Navigate to HomeScreen
+                        routes: [{ name: initialScreen }], // Navigate to initialScreen
                     });
                 } else {
                     setLoginError(data.message || 'Invalid credentials');

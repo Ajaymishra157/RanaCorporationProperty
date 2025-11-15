@@ -129,9 +129,10 @@ const PropertyDetail = () => {
     // Format functions - AppSetting jaisa
     const formatDate = (date) => {
         return date.toLocaleDateString('en-IN', {
-            day: '2-digit',
+            year: 'numeric',
             month: '2-digit',
-            year: 'numeric'
+            day: '2-digit',
+
         });
     };
 
@@ -161,10 +162,10 @@ const PropertyDetail = () => {
 
     const handleSubmitVisit = async () => {
         // Validate form first
-        if (!validateForm()) {
-            ToastAndroid.show('Please fix all errors', ToastAndroid.SHORT);
-            return;
-        }
+        // if (!validateForm()) {
+        //     ToastAndroid.show('Please fix all errors', ToastAndroid.SHORT);
+        //     return;
+        // }
 
         setScheduleLoading(true);
 
@@ -173,29 +174,48 @@ const PropertyDetail = () => {
 
             const visitData = {
                 customer_id: customer_id,
-                property_id: property.p_id,
-                visit_date: formatDate(selectedDate),
-                visit_time: formatTime(selectedTime),
-                name: visitName,
-                phone: visitPhone,
-                email: visitEmail,
-                notes: visitNotes,
-                property_title: propertyData.title,
-                property_price: propertyData.price
+                p_id: property.p_id,
+                date: selectedDate,
+                time: formatTime(selectedTime),
+                remark: visitNotes
+
             };
 
             console.log('Scheduling visit:', visitData);
 
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            // ✅ API CALL INTEGRATION
 
-            ToastAndroid.show('Visit scheduled successfully!', ToastAndroid.SHORT);
-            setIsVisitModalVisible(false);
-            resetVisitForm();
+            const response = await fetch(`${ApiConstant.URL}${ApiConstant.OtherURL.add_scheadule}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(visitData)
+            });
+
+            const result = await response.json();
+
+            console.log('API Response:', result);
+
+            // ✅ RESPONSE HANDLING
+            if (result.code === 200) {
+                ToastAndroid.show(result.message || 'Visit scheduled successfully!', ToastAndroid.SHORT);
+                setIsVisitModalVisible(false);
+                resetVisitForm();
+
+                // ✅ Optional: Refresh visits list if needed
+                if (onVisitScheduled) {
+                    onVisitScheduled();
+                }
+            } else {
+                // ✅ API ERROR
+                const errorMessage = result.message || 'Failed to schedule visit';
+                ToastAndroid.show(errorMessage, ToastAndroid.SHORT);
+            }
 
         } catch (error) {
             console.log('Error scheduling visit:', error);
-            ToastAndroid.show('Failed to schedule visit', ToastAndroid.SHORT);
+            ToastAndroid.show('Network error. Please try again.', ToastAndroid.SHORT);
         } finally {
             setScheduleLoading(false);
         }
@@ -943,116 +963,194 @@ const PropertyDetail = () => {
 
 
                 {/* Contact Owner */}
-                <View style={{
-                    backgroundColor: '#fff',
-                    padding: 20,
-                    marginTop: 10,
-                    marginBottom: 20,
-                }}>
-                    <Text style={{
-                        fontSize: 18,
-                        fontFamily: 'Inter-Bold',
-                        color: colors.TextColorBlack,
-                        marginBottom: 12,
-                    }}>
+                <View
+                    style={{
+                        backgroundColor: '#fff',
+                        padding: 14,
+                        marginTop: 10,
+                        marginBottom: 18,
+                        borderRadius: 12,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 3,
+                        elevation: 3,
+                    }}
+                >
+                    <Text
+                        style={{
+                            fontSize: 17,
+                            fontFamily: 'Inter-Bold',
+                            color: colors.TextColorBlack,
+                            marginBottom: 14,
+                        }}
+                    >
                         Contact Owner
                     </Text>
 
-                    <View style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        marginBottom: 15,
-                    }}>
-                        <View style={{
-                            width: 50,
-                            height: 50,
-                            borderRadius: 25,
-                            backgroundColor: colors.AppColor,
-                            justifyContent: 'center',
+                    {/* Owner Info Row */}
+                    <View
+                        style={{
+                            flexDirection: 'row',
                             alignItems: 'center',
-                            marginRight: 12,
-                        }}>
-                            <Text style={{
-                                fontSize: 18,
-                                fontFamily: 'Inter-Bold',
-                                color: '#fff',
-                            }}>
+                            marginBottom: 15,
+                        }}
+                    >
+                        <View
+                            style={{
+                                width: 45,
+                                height: 45,
+                                borderRadius: 22.5,
+                                backgroundColor: colors.AppColor,
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                marginRight: 10,
+                                elevation: 2,
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    fontSize: 18,
+                                    fontFamily: 'Inter-Bold',
+                                    color: '#fff',
+                                }}
+                            >
                                 {propertyData.owner.name.charAt(0)}
                             </Text>
                         </View>
 
                         <View style={{ flex: 1 }}>
-                            <Text style={{
-                                fontSize: 16,
-                                fontFamily: 'Inter-Bold',
-                                color: colors.TextColorBlack,
-                            }}>
+                            <Text
+                                style={{
+                                    fontSize: 15,
+                                    fontFamily: 'Inter-Bold',
+                                    color: colors.TextColorBlack,
+                                }}
+                            >
                                 {propertyData.owner.name}
                             </Text>
-                            <Text style={{
-                                fontSize: 14,
-                                fontFamily: 'Inter-Regular',
-                                color: '#666',
-                            }}>
+                            <Text
+                                style={{
+                                    fontSize: 13,
+                                    fontFamily: 'Inter-Regular',
+                                    color: '#777',
+                                }}
+                            >
                                 Property Owner
                             </Text>
                         </View>
                     </View>
 
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    {/* Buttons */}
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                        {/* Call Button */}
                         <TouchableOpacity
                             style={{
                                 flex: 1,
-                                backgroundColor: !propertyData.owner.phone || propertyData.owner.phone === '---' ? '#CCCCCC' : '#4CAF50',
-                                paddingVertical: 12,
+                                backgroundColor: '#fff',
+                                borderWidth: 1.5,
+                                borderColor:
+                                    !propertyData.owner.phone || propertyData.owner.phone === '---'
+                                        ? '#ccc'
+                                        : '#4CAF50',
+                                paddingVertical: 10,
                                 borderRadius: 8,
                                 alignItems: 'center',
                                 flexDirection: 'row',
                                 justifyContent: 'center',
-                                marginRight: 8,
-                                opacity: !propertyData.owner.phone || propertyData.owner.phone === '---' ? 0.6 : 1,
+                                opacity:
+                                    !propertyData.owner.phone || propertyData.owner.phone === '---' ? 0.6 : 1,
                             }}
-                            onPress={(!propertyData.owner.phone || propertyData.owner.phone === '---') ? null : handleCallOwner}
+                            onPress={
+                                !propertyData.owner.phone || propertyData.owner.phone === '---'
+                                    ? null
+                                    : handleCallOwner
+                            }
                             disabled={!propertyData.owner.phone || propertyData.owner.phone === '---'}
+                            activeOpacity={0.8}
                         >
-                            <Ionicons name="call" size={18} color={(!propertyData.owner.phone || propertyData.owner.phone === '---') ? '#666' : '#fff'} />
-                            <Text style={{
-                                fontSize: 14,
-                                fontFamily: 'Inter-Medium',
-                                color: (!propertyData.owner.phone || propertyData.owner.phone === '---') ? '#666' : '#fff',
-                                marginLeft: 8,
-                            }}>
-                                {(!propertyData.owner.phone || propertyData.owner.phone === '---') ? 'No Number' : 'Call'}
+                            <Ionicons
+                                name="call"
+                                size={16}
+                                color={
+                                    !propertyData.owner.phone || propertyData.owner.phone === '---'
+                                        ? '#999'
+                                        : '#4CAF50'
+                                }
+                            />
+                            <Text
+                                style={{
+                                    fontSize: 13.5,
+                                    fontFamily: 'Inter-Medium',
+                                    color:
+                                        !propertyData.owner.phone || propertyData.owner.phone === '---'
+                                            ? '#999'
+                                            : '#4CAF50',
+                                    marginLeft: 6,
+                                }}
+                            >
+                                {(!propertyData.owner.phone || propertyData.owner.phone === '---')
+                                    ? 'No Number'
+                                    : 'Call'}
                             </Text>
                         </TouchableOpacity>
 
+                        {/* WhatsApp Button */}
                         <TouchableOpacity
                             style={{
                                 flex: 1,
-                                backgroundColor: !propertyData.owner.phone || propertyData.owner.phone === '---' ? '#CCCCCC' : '#25D366',
-                                paddingVertical: 12,
+                                backgroundColor: '#fff',
+                                borderWidth: 1.5,
+                                borderColor:
+                                    !propertyData.owner.phone || propertyData.owner.phone === '---'
+                                        ? '#ccc'
+                                        : '#25D366',
+                                paddingVertical: 10,
                                 borderRadius: 8,
                                 alignItems: 'center',
                                 flexDirection: 'row',
                                 justifyContent: 'center',
-                                marginLeft: 8,
-                                opacity: !propertyData.owner.phone || propertyData.owner.phone === '---' ? 0.6 : 1,
+                                opacity:
+                                    !propertyData.owner.phone || propertyData.owner.phone === '---' ? 0.6 : 1,
                             }}
-                            onPress={(!propertyData.owner.phone || propertyData.owner.phone === '---') ? null : handleMessageOwner}
+                            onPress={
+                                !propertyData.owner.phone || propertyData.owner.phone === '---'
+                                    ? null
+                                    : handleMessageOwner
+                            }
                             disabled={!propertyData.owner.phone || propertyData.owner.phone === '---'}
+                            activeOpacity={0.8}
                         >
-                            <Ionicons name="logo-whatsapp" size={18} color={(!propertyData.owner.phone || propertyData.owner.phone === '---') ? '#666' : '#fff'} />
-                            <Text style={{
-                                fontSize: 14,
-                                fontFamily: 'Inter-Medium',
-                                color: (!propertyData.owner.phone || propertyData.owner.phone === '---') ? '#666' : '#fff',
-                                marginLeft: 8,
-                            }}>
-                                {(!propertyData.owner.phone || propertyData.owner.phone === '---') ? 'Not Available' : 'WhatsApp'}
+                            <Ionicons
+                                name="logo-whatsapp"
+                                size={16}
+                                color={
+                                    !propertyData.owner.phone || propertyData.owner.phone === '---'
+                                        ? '#999'
+                                        : '#25D366'
+                                }
+                            />
+                            <Text
+                                style={{
+                                    fontSize: 13.5,
+                                    fontFamily: 'Inter-Medium',
+                                    color:
+                                        !propertyData.owner.phone || propertyData.owner.phone === '---'
+                                            ? '#999'
+                                            : '#25D366',
+                                    marginLeft: 6,
+                                }}
+                            >
+                                {(!propertyData.owner.phone || propertyData.owner.phone === '---')
+                                    ? 'Not Available'
+                                    : 'WhatsApp'}
                             </Text>
                         </TouchableOpacity>
                     </View>
+
                 </View>
+
+
             </ScrollView>
 
             {/* Fixed Bottom Action Bar */}
@@ -1064,6 +1162,7 @@ const PropertyDetail = () => {
                 flexDirection: 'row',
                 justifyContent: 'space-between',
                 alignItems: 'center',
+
             }}>
                 <View>
                     <Text style={{
@@ -1096,7 +1195,7 @@ const PropertyDetail = () => {
                             alignItems: 'center',
                             gap: 6,
                         }}
-                        onPress={() => navigation.navigate('CustomerEnquiry')}
+                        onPress={() => navigation.navigate('CustomerEnquiry', { property: property })}
                     >
                         <Ionicons name="chatbubble-outline" size={16} color={colors.AppColor} />
                         <Text style={{
@@ -1109,7 +1208,7 @@ const PropertyDetail = () => {
                     </TouchableOpacity>
 
                     {/* Schedule Visit with Calendar Icon */}
-                    <TouchableOpacity
+                    {/* <TouchableOpacity
                         style={{
                             backgroundColor: colors.AppColor,
                             paddingHorizontal: 16,
@@ -1129,7 +1228,7 @@ const PropertyDetail = () => {
                         }}>
                             Visit
                         </Text>
-                    </TouchableOpacity>
+                    </TouchableOpacity> */}
                 </View>
             </View>
             <Modal
@@ -1322,18 +1421,18 @@ const PropertyDetail = () => {
 
                             {/* Contact Information */}
                             <View style={{ marginBottom: 20 }}>
-                                <Text style={{
+                                {/* <Text style={{
                                     fontSize: 16,
                                     fontFamily: 'Inter-Bold',
                                     color: colors.TextColorBlack,
                                     marginBottom: 15,
                                 }}>
                                     Your Information
-                                </Text>
+                                </Text> */}
 
                                 <View style={{ gap: 15 }}>
                                     {/* Name */}
-                                    <View>
+                                    {/* <View>
                                         <Text style={{
                                             fontSize: 14,
                                             fontFamily: 'Inter-Medium',
@@ -1371,10 +1470,10 @@ const PropertyDetail = () => {
                                                 {errors.name}
                                             </Text>
                                         ) : null}
-                                    </View>
+                                    </View> */}
 
                                     {/* Phone */}
-                                    <View>
+                                    {/* <View>
                                         <Text style={{
                                             fontSize: 14,
                                             fontFamily: 'Inter-Medium',
@@ -1414,10 +1513,10 @@ const PropertyDetail = () => {
                                                 {errors.phone}
                                             </Text>
                                         ) : null}
-                                    </View>
+                                    </View> */}
 
                                     {/* Email */}
-                                    <View>
+                                    {/* <View>
                                         <Text style={{
                                             fontSize: 14,
                                             fontFamily: 'Inter-Medium',
@@ -1442,7 +1541,7 @@ const PropertyDetail = () => {
                                             onChangeText={setVisitEmail}
                                             keyboardType="email-address"
                                         />
-                                    </View>
+                                    </View> */}
 
                                     {/* Notes */}
                                     <View>
@@ -1506,7 +1605,7 @@ const PropertyDetail = () => {
                     </View>
                 </View>
             </Modal>
-        </SafeAreaView>
+        </SafeAreaView >
     );
 };
 

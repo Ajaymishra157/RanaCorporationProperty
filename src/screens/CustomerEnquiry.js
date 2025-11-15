@@ -20,12 +20,13 @@ const CustomerEnquiry = () => {
     const route = useRoute();
     const { property } = route.params || {};
 
+    const [enquiryType, setEnquiryType] = useState('self'); // 'self' or 'other'
     const [formData, setFormData] = useState({
         name: '',
         mobile: '',
         email: '',
         address: '',
-        city_id: '',
+
         remark: ''
     });
 
@@ -33,10 +34,89 @@ const CustomerEnquiry = () => {
     const [loading, setLoading] = useState(false);
     const [cities, setCities] = useState([]);
     const [loadingCities, setLoadingCities] = useState(false);
+    const [profileData, setProfileData] = useState(null);
+    const [loadingProfile, setLoadingProfile] = useState(true);
 
+    // ✅ Profile Data API
+    const ProfileDataApi = async () => {
+        try {
+            const Id = await AsyncStorage.getItem('id');
 
+            if (!Id) {
+                setLoadingProfile(false);
+                return;
+            }
 
+            const response = await fetch(`${ApiConstant.URL}${ApiConstant.OtherURL.list_user}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    id: Id
+                }),
+            });
 
+            const result = await response.json();
+            if (result.code === 200 && Array.isArray(result.payload) && result.payload.length > 0) {
+                const data = result.payload[0];
+                setProfileData(data);
+
+                // ✅ Automatically fill form if user selects self later
+                if (enquiryType === 'self') {
+                    autoFillForm(data);
+                }
+            } else {
+                console.log('Error:', result.message || 'Failed to load user data');
+            }
+        } catch (error) {
+            console.log('Error fetching data:', error.message);
+        } finally {
+            setLoadingProfile(false);
+        }
+    };
+
+    // ✅ Auto-fill form with profile data
+    const autoFillForm = (profile) => {
+        setFormData({
+            name: profile.staff_name || '',
+            mobile: profile.whatsapp_number || '',
+            email: profile.email || '',
+            address: profile.address || '',
+            city_id: profile.city_id || '',
+            remark: ''
+        });
+    };
+
+    // ✅ Clear form for other person
+    const clearForm = () => {
+        setFormData({
+            name: '',
+            mobile: '',
+            email: '',
+            address: '',
+            city_id: '',
+            remark: ''
+        });
+        setErrors({});
+    };
+
+    // ✅ Handle enquiry type change
+    const handleEnquiryTypeChange = (type) => {
+        setEnquiryType(type);
+
+        if (type === 'self' && profileData) {
+            autoFillForm(profileData);
+            setErrors({});
+        } else {
+            clearForm();
+            setErrors({});
+        }
+    };
+
+    useEffect(() => {
+        ProfileDataApi();
+    }, []);
 
     const handleInputChange = (field, value) => {
         setFormData(prev => ({
@@ -75,17 +155,15 @@ const CustomerEnquiry = () => {
             newErrors.address = 'Address is required';
         }
 
-        if (!formData.city_id) {
-            newErrors.city_id = 'Please select a city';
-        }
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
 
     const handleSubmit = async () => {
+        console.log('Submitting enquiry:');
         if (!validateForm()) {
-
+            console.log('Submitting enquiry:1');
             return;
         }
 
@@ -94,10 +172,15 @@ const CustomerEnquiry = () => {
 
             const customer_id = await AsyncStorage.getItem('id');
             const payload = {
-                ...formData,
                 customer_id: customer_id || '',
-                property_id: property?.p_id || '',
-                property_title: property?.product_name || ''
+                p_id: property?.p_id || '',
+                p_title: property?.product_name || '',
+                name: formData.name,
+                mobile: formData.mobile,
+                email: formData.email,
+                address: formData.address,
+                remark: formData.remark
+
             };
 
             console.log('Submitting enquiry:', payload);
@@ -111,6 +194,7 @@ const CustomerEnquiry = () => {
             });
 
             const result = await response.json();
+
 
             if (result.code === 200) {
                 ToastAndroid.show('Enquiry submitted successfully!', ToastAndroid.SHORT);
@@ -128,7 +212,7 @@ const CustomerEnquiry = () => {
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
+        <View style={{ flex: 1, backgroundColor: '#f9f9f9' }}>
             <Header
                 title="Submit Enquiry"
                 onBackPress={() => navigation.goBack()}
@@ -178,6 +262,161 @@ const CustomerEnquiry = () => {
                     </View>
                 )}
 
+                {/* Enquiry Type Selection */}
+                <View style={{
+                    backgroundColor: '#fff',
+                    margin: 12,
+                    padding: 16,
+                    borderRadius: 10,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.08,
+                    shadowRadius: 3,
+                    elevation: 2,
+                }}>
+                    <Text style={{
+                        fontSize: 16,
+                        fontFamily: 'Inter-Bold',
+                        color: colors.TextColorBlack,
+                        marginBottom: 12,
+                    }}>
+                        Who is this enquiry for?
+                    </Text>
+
+                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                        {/* Self Option */}
+                        <TouchableOpacity
+                            style={{
+                                flex: 1,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                padding: 12,
+                                borderWidth: 1.5,
+                                borderColor: enquiryType === 'self' ? colors.AppColor : '#ddd',
+                                borderRadius: 6,
+                                backgroundColor: enquiryType === 'self' ? '#f0f8ff' : '#fff',
+                            }}
+                            onPress={() => handleEnquiryTypeChange('self')}
+                            disabled={loadingProfile}
+                        >
+                            <View style={{
+                                width: 18,
+                                height: 18,
+                                borderRadius: 9,
+                                borderWidth: 1.5,
+                                borderColor: enquiryType === 'self' ? colors.AppColor : '#999',
+                                backgroundColor: enquiryType === 'self' ? colors.AppColor : 'transparent',
+                                marginRight: 8,
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                            }}>
+                                {enquiryType === 'self' && (
+                                    <View style={{
+                                        width: 6,
+                                        height: 6,
+                                        borderRadius: 3,
+                                        backgroundColor: '#fff',
+                                    }} />
+                                )}
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{
+                                    fontSize: 14,
+                                    fontFamily: 'Inter-Bold',
+                                    color: colors.TextColorBlack,
+                                }}>
+                                    Myself
+                                </Text>
+                                <Text style={{
+                                    fontSize: 11,
+                                    fontFamily: 'Inter-Regular',
+                                    color: '#666',
+                                }}>
+                                    Use my profile
+                                </Text>
+                            </View>
+                            {loadingProfile && enquiryType === 'self' && (
+                                <ActivityIndicator size="small" color={colors.AppColor} />
+                            )}
+                        </TouchableOpacity>
+
+                        {/* Other Option */}
+                        <TouchableOpacity
+                            style={{
+                                flex: 1,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                padding: 12,
+                                borderWidth: 1.5,
+                                borderColor: enquiryType === 'other' ? colors.AppColor : '#ddd',
+                                borderRadius: 6,
+                                backgroundColor: enquiryType === 'other' ? '#f0f8ff' : '#fff',
+                            }}
+                            onPress={() => handleEnquiryTypeChange('other')}
+                        >
+                            <View style={{
+                                width: 18,
+                                height: 18,
+                                borderRadius: 9,
+                                borderWidth: 1.5,
+                                borderColor: enquiryType === 'other' ? colors.AppColor : '#999',
+                                backgroundColor: enquiryType === 'other' ? colors.AppColor : 'transparent',
+                                marginRight: 8,
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                            }}>
+                                {enquiryType === 'other' && (
+                                    <View style={{
+                                        width: 6,
+                                        height: 6,
+                                        borderRadius: 3,
+                                        backgroundColor: '#fff',
+                                    }} />
+                                )}
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{
+                                    fontSize: 14,
+                                    fontFamily: 'Inter-Bold',
+                                    color: colors.TextColorBlack,
+                                }}>
+                                    Someone Else
+                                </Text>
+                                <Text style={{
+                                    fontSize: 11,
+                                    fontFamily: 'Inter-Regular',
+                                    color: '#666',
+                                }}>
+                                    Enter manually
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Info Message */}
+                    {enquiryType === 'self' && (
+                        <View style={{
+                            marginTop: 8,
+                            padding: 8,
+                            backgroundColor: '#e8f4ff',
+                            borderRadius: 4,
+                            borderLeftWidth: 3,
+                            borderLeftColor: colors.AppColor,
+                        }}>
+                            <Text style={{
+                                fontSize: 11,
+                                fontFamily: 'Inter-Regular',
+                                color: colors.AppColor,
+                            }}>
+                                {loadingProfile
+                                    ? 'Loading your profile...'
+                                    : 'Your profile info has been auto-filled.'
+                                }
+                            </Text>
+                        </View>
+                    )}
+                </View>
+
                 {/* Enquiry Form */}
                 <View style={{
                     backgroundColor: '#fff',
@@ -196,7 +435,7 @@ const CustomerEnquiry = () => {
                         color: colors.TextColorBlack,
                         marginBottom: 20,
                     }}>
-                        Personal Information
+                        {enquiryType === 'self' ? 'Your Information' : 'Personal Information'}
                     </Text>
 
                     {/* Name */}
@@ -218,12 +457,13 @@ const CustomerEnquiry = () => {
                                 fontSize: 16,
                                 fontFamily: 'Inter-Regular',
                                 color: colors.TextColorBlack,
-                                backgroundColor: '#f9f9f9',
+                                backgroundColor: enquiryType === 'self' ? '#fff' : '#fff',
                             }}
-                            placeholder="Enter your full name"
+                            placeholder="Enter full name"
                             value={formData.name}
                             onChangeText={(text) => handleInputChange('name', text)}
                             placeholderTextColor="#999"
+                            editable={!loadingProfile}
                         />
                         {errors.name && (
                             <Text style={{
@@ -256,7 +496,7 @@ const CustomerEnquiry = () => {
                                 fontSize: 16,
                                 fontFamily: 'Inter-Regular',
                                 color: colors.TextColorBlack,
-                                backgroundColor: '#f9f9f9',
+                                backgroundColor: enquiryType === 'self' ? '#fff' : '#fff',
                             }}
                             placeholder="Enter 10-digit mobile number"
                             value={formData.mobile}
@@ -264,6 +504,7 @@ const CustomerEnquiry = () => {
                             keyboardType="phone-pad"
                             maxLength={10}
                             placeholderTextColor="#999"
+                            editable={!loadingProfile}
                         />
                         {errors.mobile && (
                             <Text style={{
@@ -296,14 +537,15 @@ const CustomerEnquiry = () => {
                                 fontSize: 16,
                                 fontFamily: 'Inter-Regular',
                                 color: colors.TextColorBlack,
-                                backgroundColor: '#f9f9f9',
+                                backgroundColor: enquiryType === 'self' ? '#fff' : '#fff',
                             }}
-                            placeholder="Enter your email address"
+                            placeholder="Enter email address"
                             value={formData.email}
                             onChangeText={(text) => handleInputChange('email', text)}
                             keyboardType="email-address"
                             autoCapitalize="none"
                             placeholderTextColor="#999"
+                            editable={!loadingProfile}
                         />
                         {errors.email && (
                             <Text style={{
@@ -336,16 +578,17 @@ const CustomerEnquiry = () => {
                                 fontSize: 16,
                                 fontFamily: 'Inter-Regular',
                                 color: colors.TextColorBlack,
-                                backgroundColor: '#f9f9f9',
+                                backgroundColor: enquiryType === 'self' ? '#fff' : '#fff',
                                 minHeight: 80,
                             }}
-                            placeholder="Enter your complete address"
+                            placeholder="Enter complete address"
                             value={formData.address}
                             onChangeText={(text) => handleInputChange('address', text)}
                             multiline
                             numberOfLines={3}
                             textAlignVertical="top"
                             placeholderTextColor="#999"
+                            editable={!loadingProfile}
                         />
                         {errors.address && (
                             <Text style={{
@@ -358,8 +601,6 @@ const CustomerEnquiry = () => {
                             </Text>
                         )}
                     </View>
-
-
 
                     {/* Remarks */}
                     <View style={{ marginBottom: 20 }}>
@@ -380,7 +621,7 @@ const CustomerEnquiry = () => {
                                 fontSize: 16,
                                 fontFamily: 'Inter-Regular',
                                 color: colors.TextColorBlack,
-                                backgroundColor: '#f9f9f9',
+                                backgroundColor: '#fff',
                                 minHeight: 100,
                             }}
                             placeholder="Any additional information or questions..."
@@ -396,7 +637,7 @@ const CustomerEnquiry = () => {
                     {/* Submit Button */}
                     <TouchableOpacity
                         style={{
-                            backgroundColor: loading ? '#ccc' : colors.AppColor,
+                            backgroundColor: (loading || loadingProfile) ? '#ccc' : colors.AppColor,
                             padding: 16,
                             borderRadius: 8,
                             flexDirection: 'row',
@@ -406,7 +647,7 @@ const CustomerEnquiry = () => {
                             marginTop: 10,
                         }}
                         onPress={handleSubmit}
-                        disabled={loading}
+                        disabled={loading || loadingProfile}
                     >
                         {loading ? (
                             <ActivityIndicator size="small" color="#fff" />

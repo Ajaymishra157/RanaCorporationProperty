@@ -82,9 +82,7 @@ const AgentAddProperty = () => {
 
     const [errors, setErrors] = useState({});
 
-    // // ✅ NEW: Agent details states
-    // const [agentName, setAgentName] = useState('');
-    // const [agentMobile, setAgentMobile] = useState('');
+
 
     // Available amenities
     const availableAmenities = [
@@ -114,12 +112,7 @@ const AgentAddProperty = () => {
             setDescription(property.description || '');
             setPrice(property.unit_price || property.price || '');
             setArea(property.size || '');
-            setBedrooms(property.bedrooms || '');
-            setBathrooms(property.bathrooms || '');
 
-            // ✅ NEW: Agent details prefilling
-            // setAgentName(property.agent_name || '');
-            // setAgentMobile(property.agent_mobile || '');
 
             // ✅ Property Type & Category
             setPropertyType(property.type || 'Residential');
@@ -354,78 +347,7 @@ const AgentAddProperty = () => {
             throw error;
         }
     };
-    // ✅ Handle photo upload with base64 conversion
-    // const handlePhotoUpload = async () => {
-    //     if (photos.length >= 10) {
-    //         Alert.alert('Limit Reached', 'You can upload maximum 10 photos');
-    //         return;
-    //     }
 
-    //     try {
-    //         const hasPermission = await checkGalleryPermission();
-
-    //         if (!hasPermission) {
-    //             Alert.alert(
-    //                 'Permission Denied',
-    //                 'Storage permission is required to access gallery. Please enable it in app settings.',
-    //                 [
-    //                     { text: 'Cancel', style: 'cancel' },
-    //                     {
-    //                         text: 'Open Settings',
-    //                         onPress: () => Linking.openSettings()
-    //                     }
-    //                 ]
-    //             );
-    //             return;
-    //         }
-    //         const image = await ImagePicker.openPicker({
-    //             mediaType: 'photo',
-    //             multiple: true,
-    //             maxFiles: 10 - photos.length,
-    //             cropping: true,
-    //             compressImageQuality: 0.7, // Quality reduce karo for smaller size
-    //             compressImageMaxWidth: 1024, // Max width limit
-    //             compressImageMaxHeight: 1024, // Max height limit
-    //             includeBase64: true, // ✅ Direct base64 lelo
-    //             forceJpg: true,
-    //         });
-
-    //         // Handle single or multiple images
-    //         const selectedImages = Array.isArray(image) ? image : [image];
-
-    //         const newPhotos = await Promise.all(
-    //             selectedImages.map(async (img, index) => {
-    //                 // Agar ImagePicker se direct base64 mil raha hai toh use karo
-    //                 let base64Data = img.data;
-
-    //                 // Agar base64 nahi mila toh manually convert karo
-    //                 if (!base64Data) {
-    //                     base64Data = await convertImageToBase64(img.path);
-    //                 }
-
-    //                 return {
-    //                     id: Date.now() + index,
-    //                     uri: img.path,
-    //                     base64: base64Data,
-    //                     mime: img.mime || 'image/jpeg',
-    //                     width: img.width,
-    //                     height: img.height,
-    //                 };
-    //             })
-    //         );
-
-    //         setPhotos([...photos, ...newPhotos]);
-    //         ToastAndroid.show(`${selectedImages.length} photo(s) added`, ToastAndroid.SHORT);
-
-    //     } catch (error) {
-    //         console.log('Gallery Error:', error);
-    //         if (error.code === 'E_PERMISSION_MISSING') {
-    //             Alert.alert('Permission Required', 'Please grant storage permission to access gallery');
-    //         } else if (error.code !== 'E_PICKER_CANCELLED') {
-    //             Alert.alert('Error', 'Cannot open gallery. Please check app permissions.');
-    //         }
-    //     }
-    // };
     // ✅ Handle photo upload with base64 conversion - FIXED VERSION
     const handlePhotoUpload = async () => {
         if (photos.length >= 10) {
@@ -459,61 +381,76 @@ const AgentAddProperty = () => {
                 compressImageQuality: 0.7,
                 compressImageMaxWidth: 1024,
                 compressImageMaxHeight: 1024,
-                includeBase64: true,
+                includeBase64: true, // ✅ Yeh important hai
                 forceJpg: true,
             });
 
             // Handle single or multiple images
             const selectedImages = Array.isArray(image) ? image : [image];
 
-            // ✅ FILTER OUT IMAGES WITHOUT VALID PATH OR DATA
-            const validImages = selectedImages.filter(img =>
-                img.path && (img.data || img.path) // Must have path and either data or path
-            );
+            console.log('📸 Selected Images:', selectedImages);
 
-            if (validImages.length === 0) {
-                ToastAndroid.show('No valid images selected', ToastAndroid.SHORT);
-                return;
-            }
-
+            // ✅ Filter valid images and process them
             const newPhotos = await Promise.all(
-                validImages.map(async (img, index) => {
+                selectedImages.map(async (img, index) => {
                     try {
+                        console.log(`🔄 Processing image ${index}:`, img);
+
+                        // ✅ Method 1: Direct base64 from image picker
                         let base64Data = img.data;
 
-                        // ✅ Agar base64 nahi mila toh manually convert karo with ERROR HANDLING
-                        if (!base64Data) {
-                            console.log(`Converting image ${index} to base64 manually`);
+                        // ✅ Method 2: Agar base64 nahi mila toh path se convert karo
+                        if (!base64Data && img.path) {
+                            console.log(`🔄 Converting image ${index} from path`);
                             base64Data = await convertImageToBase64(img.path);
                         }
 
-                        // ✅ Validate that we have base64 data
+                        // ✅ Method 3: Agar abhi bhi nahi mila toh error throw karo
                         if (!base64Data) {
-                            console.log(`Failed to get base64 for image ${index}`);
-                            throw new Error('Failed to convert image to base64');
+                            console.log(`❌ No base64 data for image ${index}`);
+                            throw new Error('Failed to get base64 data');
                         }
 
+                        // ✅ Ensure base64 is clean (remove data URL prefix if present)
+                        const cleanBase64 = base64Data.includes('base64,')
+                            ? base64Data.split('base64,')[1]
+                            : base64Data;
+
+                        console.log(`✅ Image ${index} processed successfully`);
+
                         return {
-                            id: Date.now() + index,
+                            id: `new_${Date.now()}_${index}`,
                             uri: img.path,
-                            base64: base64Data,
+                            base64: cleanBase64, // ✅ Clean base64 data
                             mime: img.mime || 'image/jpeg',
                             width: img.width || 400,
                             height: img.height || 300,
+                            isExisting: false, // ✅ New image flag
                         };
                     } catch (error) {
-                        console.log(`Error processing image ${index}:`, error);
-                        return null; // Return null for failed images
+                        console.log(`❌ Error processing image ${index}:`, error);
+                        return null;
                     }
                 })
             );
 
-            // ✅ FILTER OUT NULL VALUES (failed images)
+            // ✅ Filter out failed images
             const successfulPhotos = newPhotos.filter(photo => photo !== null);
 
             if (successfulPhotos.length > 0) {
-                setPhotos([...photos, ...successfulPhotos]);
+                setPhotos(prev => [...prev, ...successfulPhotos]);
                 ToastAndroid.show(`${successfulPhotos.length} photo(s) added successfully`, ToastAndroid.SHORT);
+
+                // ✅ Debug log
+                console.log('📸 New photos added:', successfulPhotos.length);
+                successfulPhotos.forEach((photo, idx) => {
+                    console.log(`📸 Photo ${idx}:`, {
+                        id: photo.id,
+                        hasBase64: !!photo.base64,
+                        base64Length: photo.base64?.length,
+                        isExisting: photo.isExisting
+                    });
+                });
             } else {
                 ToastAndroid.show('Failed to add any photos', ToastAndroid.SHORT);
             }
@@ -719,10 +656,6 @@ const AgentAddProperty = () => {
         if (!selectedCity) tempErrors.city = 'Please select city';
         if (photos.length === 0) tempErrors.photos = 'Please add at least one photo';
 
-        // ✅ OPTIONAL: Agent validation agar required hai
-        // if (!agentName.trim()) tempErrors.agentName = 'Please enter agent name';
-        // if (!agentMobile.trim()) tempErrors.agentMobile = 'Please enter agent mobile';
-        // if (agentMobile && agentMobile.length !== 10) tempErrors.agentMobile = 'Please enter valid 10-digit mobile number';
 
         setErrors(tempErrors);
         return Object.keys(tempErrors).length === 0;
@@ -752,107 +685,7 @@ const AgentAddProperty = () => {
     }, [photos.length]);
 
 
-    // ✅ Main Submit Function with Base64 Array
-    // const handleSubmit = async () => {
-    //     if (!validateForm()) return;
 
-    //     setUploading(true);
-
-    //     try {
-    //         // ✅ Separate new and existing images
-    //         // ✅ Prepare photos array in base64 format - ONLY FOR NEW IMAGES
-    //         const photosBase64Array = await Promise.all(
-    //             photos.map(async (photo) => {
-    //                 // Agar existing image hai (edit mode mein) aur base64 nahi hai
-    //                 if (photo.isExisting && !photo.base64) {
-    //                     try {
-    //                         // Existing image ko base64 mein convert karo
-    //                         const base64Data = await convertImageToBase64(photo.uri);
-    //                         return `data:${photo.mime};base64,${base64Data}`;
-    //                     } catch (error) {
-    //                         console.log('Error converting existing image to base64:', error);
-    //                         // Agar convert nahi ho pa raha toh original URI use karo
-    //                         return photo.uri;
-    //                     }
-    //                 }
-    //                 // Agar new image hai ya existing image ka base64 hai
-    //                 return `data:${photo.mime};base64,${photo.base64}`;
-    //             })
-    //         );
-
-    //         // ✅ Filter out any failed conversions
-    //         const validPhotosBase64Array = photosBase64Array.filter(photo =>
-    //             photo && !photo.includes('undefined')
-    //         );
-
-
-
-    //         // ✅ Prepare JSON data
-    //         const propertyData = {
-    //             // ✅ Edit mode mein p_id add karein
-    //             ...(property && { p_id: property.p_id }),
-    //             category_id: selectedCategory.category_id || selectedCategory.id,
-    //             product_name: title,
-    //             description: description,
-    //             type: propertyType,
-    //             price: price,
-    //             city: selectedCity ? (selectedCity.id || selectedCity.id) : property.city, // ✅ City ID bhejo
-    //             state: selectedState ? (selectedState.id || selectedState.id) : property.state, // ✅ State ID bhejo
-    //             location: location,
-    //             amenities: amenities.join(','),
-    //             budget: budget,
-    //             size: area,
-    //             map: mapLocation,
-    //             p_status: propertyStatus,
-    //             p_image: validPhotosBase64Array,
-    //             p_video: videoLink // ✅ Video link
-    //         };
-
-    //         console.log('📤 Sending Property Data with Images:', {
-    //             ...propertyData,
-    //             p_image: `${photosBase64Array.length} images`,
-
-    //         });
-
-    //         const endpoint = property
-    //             ? `${ApiConstant.URL}${ApiConstant.OtherURL.update_property}`
-    //             : `${ApiConstant.URL}${ApiConstant.OtherURL.add_property}`;
-
-    //         // ✅ API Call for JSON
-    //         const response = await fetch(endpoint, {
-    //             method: 'POST',
-    //             headers: {
-    //                 'Content-Type': 'application/json',
-    //             },
-    //             body: JSON.stringify(propertyData),
-    //         });
-
-    //         const result = await response.json();
-    //         console.log('📥 API Response:', result);
-
-    //         if (result.code === 200) {
-    //             const successMessage = property
-    //                 ? 'Property updated successfully!'
-    //                 : 'Property added successfully!';
-
-    //             ToastAndroid.show(successMessage, ToastAndroid.LONG);
-
-    //             if (!property) {
-    //                 resetForm();
-    //             }
-
-    //             navigation.goBack();
-    //         } else {
-    //             ToastAndroid.show(result.message || 'Failed to save property', ToastAndroid.LONG);
-    //         }
-
-    //     } catch (error) {
-    //         console.log('❌ Error adding property:', error);
-    //         ToastAndroid.show('Network error occurred', ToastAndroid.LONG);
-    //     } finally {
-    //         setUploading(false);
-    //     }
-    // };
 
     // ✅ Main Submit Function with Base64 Array - UPDATED FOR CORRECT IMAGE HANDLING
     const handleSubmit = async () => {
@@ -888,14 +721,14 @@ const AgentAddProperty = () => {
             // ✅ Prepare JSON data
             const propertyData = {
                 ...(property && { p_id: property.p_id }),
-                category_id: selectedCategory.category_id || selectedCategory.id,
+
                 user_id: userId,
                 product_name: title,
                 description: description,
                 type: propertyType,
                 price: price,
-                city: selectedCity ? (selectedCity.id || selectedCity.id) : property.city,
-                state: selectedState ? (selectedState.id || selectedState.id) : property.state,
+                city: selectedCity ? (selectedCity.id || selectedCity.id) : property?.city || '',
+                state: selectedState ? (selectedState.id || selectedState.id) : property?.state || '',
                 location: location,
                 amenities: amenities.join(','),
                 budget: budget,
@@ -905,6 +738,11 @@ const AgentAddProperty = () => {
                 p_video: videoLink,
 
             };
+
+            // ✅ Category add karo agar available hai (OPTIONAL)
+            if (selectedCategory) {
+                propertyData.category_id = selectedCategory ? (selectedCategory.category_id || selectedCategory.id || '') : '';
+            }
 
             // ✅ EDIT MODE: Sirf new images bhejo
             if (property) {
@@ -1011,7 +849,7 @@ const AgentAddProperty = () => {
 
                 <View style={{ padding: 20 }}>
 
-                    {/* ✅ Category Modal */}
+
                     {/* ✅ Category Modal - React Native Element Dropdown */}
                     <Text style={{
                         fontSize: 16,

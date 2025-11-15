@@ -20,7 +20,7 @@ import Bottomtab from '../components/Bottomtab';
 const Profile = () => {
     const navigation = useNavigation();
     const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-
+    const [countData, setCountData] = useState([]);
     const [ProfileData, setProfileData] = useState([]);
     console.log("profiledata", ProfileData);
 
@@ -31,9 +31,9 @@ const Profile = () => {
         email: 'rajesh.kumar@example.com',
         phone: '+91 9876543210',
         memberSince: 'January 2024',
-        totalProperties: 12,
-        activeLeads: 8,
-        completedDeals: 25,
+        totalProperties: countData?.active_property_count || '0',
+        activeLeads: countData?.active_enquiry_count || '0',
+        TotalViews: countData?.view_property_count || '0',
         rating: 4.8,
     };
     const ProfileDataApi = async () => {
@@ -68,8 +68,38 @@ const Profile = () => {
         }
     };
 
+    const ListCountApi = async () => {
+
+
+        try {
+            const agent_id = await AsyncStorage.getItem('id');
+            const response = await fetch(`${ApiConstant.URL}${ApiConstant.OtherURL.count_view_property}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    agent_id: agent_id,
+
+                }),
+            });
+
+            const result = await response.json();
+            if (result.code == 200 && result.payload) {
+                setCountData(result.payload);
+                console.log("data aya kya");
+            } else {
+                setCountData([]);
+                console.log('❌ Error: Failed to load data');
+            }
+        } catch (error) {
+            console.log('❌ Error fetching data:', error.message);
+        }
+    };
+
     useEffect(() => {
         ProfileDataApi();
+        ListCountApi();
 
     }, []);
 
@@ -123,6 +153,13 @@ const Profile = () => {
             color: '#FFC107',
             onPress: () => navigation.navigate('RatingsReviews')
         },
+        {
+            id: 8,
+            title: 'Logout',
+            icon: 'log-out-outline',
+            color: '#F44336',
+            onPress: () => handleLogout()
+        }
 
     ];
 
@@ -347,7 +384,8 @@ const Profile = () => {
                             <Text style={{
                                 fontSize: 20,
                                 fontFamily: 'Inter-Bold',
-                                color: '#4CAF50',
+                                color: '#FF9800',
+
                             }}>
                                 {userData.activeLeads}
                             </Text>
@@ -371,9 +409,9 @@ const Profile = () => {
                             <Text style={{
                                 fontSize: 20,
                                 fontFamily: 'Inter-Bold',
-                                color: '#FF9800',
+                                color: '#4CAF50',
                             }}>
-                                {userData.completedDeals}
+                                {userData.TotalViews}
                             </Text>
                             <Text style={{
                                 fontSize: 12,
@@ -381,9 +419,67 @@ const Profile = () => {
                                 color: '#666',
                                 textAlign: 'center',
                             }}>
-                                Deals Closed
+                                Total Views
                             </Text>
                         </View>
+                    </View>
+                </View>
+                {/* Additional Info */}
+                <View style={{
+                    backgroundColor: '#fff',
+                    marginTop: 10,
+                    padding: 20,
+                }}>
+                    <Text style={{
+                        fontSize: 16,
+                        fontFamily: 'Inter-Bold',
+                        color: colors.TextColorBlack,
+                        marginBottom: 10,
+                    }}>
+                        Account Information
+                    </Text>
+
+                    <View style={{
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        marginBottom: 8,
+                    }}>
+                        <Text style={{
+                            fontSize: 14,
+                            fontFamily: 'Inter-Regular',
+                            color: '#666',
+                        }}>
+                            Phone Number
+                        </Text>
+                        <Text style={{
+                            fontSize: 14,
+                            fontFamily: 'Inter-Medium',
+                            color: colors.TextColorBlack,
+                        }}>
+                            {ProfileData.whatsapp_number}
+                        </Text>
+                    </View>
+
+
+
+                    <View style={{
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                    }}>
+                        <Text style={{
+                            fontSize: 14,
+                            fontFamily: 'Inter-Regular',
+                            color: '#666',
+                        }}>
+                            Account Type
+                        </Text>
+                        <Text style={{
+                            fontSize: 14,
+                            fontFamily: 'Inter-Medium',
+                            color: colors.TextColorBlack,
+                        }}>
+                            {ProfileData.user_type}
+                        </Text>
                     </View>
                 </View>
 
@@ -432,86 +528,10 @@ const Profile = () => {
                     ))}
                 </View>
 
-                {/* Additional Info */}
-                <View style={{
-                    backgroundColor: '#fff',
-                    marginTop: 10,
-                    padding: 20,
-                }}>
-                    <Text style={{
-                        fontSize: 16,
-                        fontFamily: 'Inter-Bold',
-                        color: colors.TextColorBlack,
-                        marginBottom: 10,
-                    }}>
-                        Account Information
-                    </Text>
 
-                    <View style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        marginBottom: 8,
-                    }}>
-                        <Text style={{
-                            fontSize: 14,
-                            fontFamily: 'Inter-Regular',
-                            color: '#666',
-                        }}>
-                            Phone Number
-                        </Text>
-                        <Text style={{
-                            fontSize: 14,
-                            fontFamily: 'Inter-Medium',
-                            color: colors.TextColorBlack,
-                        }}>
-                            {ProfileData.whatsapp_number}
-                        </Text>
-                    </View>
-
-                    <View style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        marginBottom: 8,
-                    }}>
-                        <Text style={{
-                            fontSize: 14,
-                            fontFamily: 'Inter-Regular',
-                            color: '#666',
-                        }}>
-                            Member Since
-                        </Text>
-                        <Text style={{
-                            fontSize: 14,
-                            fontFamily: 'Inter-Medium',
-                            color: colors.TextColorBlack,
-                        }}>
-                            {userData.memberSince}
-                        </Text>
-                    </View>
-
-                    <View style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                    }}>
-                        <Text style={{
-                            fontSize: 14,
-                            fontFamily: 'Inter-Regular',
-                            color: '#666',
-                        }}>
-                            Account Type
-                        </Text>
-                        <Text style={{
-                            fontSize: 14,
-                            fontFamily: 'Inter-Medium',
-                            color: colors.TextColorBlack,
-                        }}>
-                            {ProfileData.user_type}
-                        </Text>
-                    </View>
-                </View>
 
                 {/* Logout Button */}
-                <TouchableOpacity
+                {/* <TouchableOpacity
                     style={{
                         backgroundColor: '#fff',
                         marginTop: 10,
@@ -535,7 +555,7 @@ const Profile = () => {
                     }}>
                         Logout
                     </Text>
-                </TouchableOpacity>
+                </TouchableOpacity> */}
 
                 <View style={{ height: 20 }} />
             </ScrollView>

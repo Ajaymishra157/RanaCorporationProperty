@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -16,6 +16,7 @@ import ApiConstant from '../constants/ApiConstant';
 import colors from '../constants/Colors';
 import Bottomtab from '../components/Bottomtab';
 import StatusModal from '../components/StatusModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ViewLeads = () => {
     const [enquiryData, setEnquiryData] = useState([]);
@@ -31,7 +32,7 @@ const ViewLeads = () => {
 
     // ✅ NEW STATES FOR SEARCH AND FILTER
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedFilter, setSelectedFilter] = useState('All');
+    const [selectedFilter, setSelectedFilter] = useState('Pending');
     const [filterModalVisible, setFilterModalVisible] = useState(false);
 
     const limit = 5;
@@ -41,9 +42,10 @@ const ViewLeads = () => {
         if (loading || loadingMore) return;
 
         pageNo === 1 ? setLoading(true) : setLoadingMore(true);
+        const agent_id = await AsyncStorage.getItem('id');
         try {
             const body = JSON.stringify({
-                enquiry_id: '',
+                agent_id: agent_id,
                 page_no: pageNo,
                 limit: limit,
                 search: search, // ✅ ADD SEARCH PARAMETER
@@ -92,13 +94,48 @@ const ViewLeads = () => {
         }, [])
     );
 
-    // ✅ HANDLE SEARCH
+    const searchTimeout = useRef(null);
+
+    // jab bhi searchQuery badlega, ye trigger hoga
+    useEffect(() => {
+        if (searchTimeout.current) {
+            clearTimeout(searchTimeout.current);
+        }
+
+        searchTimeout.current = setTimeout(() => {
+            if (searchQuery.trim() === '') {
+                // empty hone par wapas full list
+                fetchEnquiries(1, false, '', selectedFilter);
+            } else {
+                // warna filtered data
+                fetchEnquiries(1, false, searchQuery, selectedFilter);
+            }
+        }, 400); // ⏱️ 400ms delay for smooth typing
+
+        return () => clearTimeout(searchTimeout.current);
+    }, [searchQuery, selectedFilter]);
+
+
     const handleSearch = (text) => {
-        setSearchQuery(text);
-        setPage(1);
-        // Add debounce here if needed
-        fetchEnquiries(1, false, text, selectedFilter);
+        setSearchQuery(text); // bas ye hi rakho
     };
+    // ✅ HANDLE SEARCH
+    // const handleSearch = (text) => {
+    //     setSearchQuery(text);
+    //     console.log("text ye hai bhai ", text);
+    //     setPage(1);
+    //     // Agar search text empty hai to original data fetch karo
+    //     if (text == '') {
+    //         console.log("ye chala ", text);
+    //         fetchEnquiries(1, false, '', selectedFilter);
+    //     } else {
+    //         console.log("wo chala ", text);
+    //         // Search text hai to filter karo
+    //         fetchEnquiries(1, false, text, selectedFilter);
+    //     }
+
+
+    // };
 
     // ✅ HANDLE FILTER CHANGE
     const handleFilterChange = (filter) => {
@@ -111,9 +148,9 @@ const ViewLeads = () => {
     // ✅ CLEAR SEARCH AND FILTER
     const clearFilters = () => {
         setSearchQuery('');
-        setSelectedFilter('All');
+        setSelectedFilter('Pending');
         setPage(1);
-        fetchEnquiries(1, false, '', 'All');
+        fetchEnquiries(1, false, '', 'Pending');
     };
 
     const openStatusModal = (lead, event) => {
@@ -171,6 +208,12 @@ const ViewLeads = () => {
 
                 setStatusModalVisible(false);
                 setSelectedLead(null);
+
+                // ✅ OPTIONAL: REFRESH THE DATA AFTER 1 SECOND TO SYNC WITH SERVER
+                setTimeout(() => {
+                    fetchEnquiries(1, false, searchQuery, selectedFilter);
+                }, 100);
+
 
             } else {
                 const errorMessage = result.message || 'Failed to update status';
@@ -280,9 +323,7 @@ const ViewLeads = () => {
                     <Text style={{ fontSize: 16, fontFamily: 'Inter-Bold', color: colors.TextColorBlack }}>
                         {lead.name || 'No Name'}
                     </Text>
-                    <Text style={{ fontSize: 11, color: colors.Grey, fontFamily: 'Inter-Regular' }}>
-                        ID: {lead.enquiry_id}
-                    </Text>
+
                 </View>
 
                 {/* ✅ STATUS BUTTON - CLICKABLE */}
@@ -440,7 +481,7 @@ const ViewLeads = () => {
             </View>
 
             {/* CLEAR FILTERS BUTTON */}
-            {(searchQuery !== '' || selectedFilter !== 'All') && (
+            {(searchQuery !== '' || selectedFilter !== 'Pending') && (
                 <View style={{ paddingHorizontal: 12, paddingTop: 8 }}>
                     <TouchableOpacity
                         style={{
@@ -477,6 +518,7 @@ const ViewLeads = () => {
                     contentContainerStyle={{ padding: 12 }}
                     onEndReached={loadMore}
                     onEndReachedThreshold={0.2}
+                    keyboardShouldPersistTaps='handled'
                     ListFooterComponent={
                         loadingMore ? (
                             <View style={{ paddingVertical: 12 }}>
